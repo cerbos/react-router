@@ -125,7 +125,7 @@ The following future flags are currently available:
 | `v7_partialHydration`                       | Support partial hydration for Server-rendered apps                      |
 | `v7_prependBasename`                        | Prepend the router basename to navigate/fetch paths                     |
 | [`v7_relativeSplatPath`][relativesplatpath] | Fix buggy relative path resolution in splat routes                      |
-| `unstable_skipActionErrorRevalidation`      | Do not revalidate by default if the action returns a 4xx/5xx `Response` |
+| `v7_skipActionErrorRevalidation`            | Do not revalidate by default if the action returns a 4xx/5xx `Response` |
 
 ## `opts.hydrationData`
 
@@ -246,7 +246,7 @@ interface HandlerResult {
     - If you are on `/parent/child/a` and you submit to `a`'s `action`, then only `a` will have `shouldLoad=true` for the action execution of `dataStrategy`
       - After the `action`, `dataStrategy` will be called again for the `loader` revalidation, and all matches will have `shouldLoad=true` (assuming no custom `shouldRevalidate` implementations)
 
-The `dataStrategy` function should return a parallel array of `HandlerResult` instances, which indicates if the handler was successful or not. If the returned `handlerResult.result` is a `Response`, React Router will unwrap it for you (via `res.json` or `res.text`). If you need to do custom decoding of a `Response` but preserve the status code, you can return the decoded value in `handlerResult.result` and send the status along via `handlerResult.status` (for example, when using the `future.unstable_skipActionRevalidation` flag). `match.resolve()` will return a `HandlerResult` if you are not passing it a handler override function. If you are, then you need to wrap the `handler` result in a `HandlerResult` (see examples below).
+The `dataStrategy` function should return a parallel array of `HandlerResult` instances, which indicates if the handler was successful or not. If the returned `handlerResult.result` is a `Response`, React Router will unwrap it for you (via `res.json` or `res.text`). If you need to do custom decoding of a `Response` but preserve the status code, you can return the decoded value in `handlerResult.result` and send the status along via `handlerResult.status` (for example, when using the `future.v7_skipActionRevalidation` flag). `match.resolve()` will return a `HandlerResult` if you are not passing it a handler override function. If you are, then you need to wrap the `handler` result in a `HandlerResult` (see examples below).
 
 ### Example Use Cases
 
@@ -478,24 +478,16 @@ let router = createBrowserRouter(
       path: "/",
       Component: Home,
     },
-    {
-      id: "dashboard",
-      path: "/dashboard",
-    },
-    {
-      id: "account",
-      path: "/account",
-    },
   ],
   {
     async unstable_patchRoutesOnMiss({ path, patch }) {
       if (path.startsWith("/dashboard")) {
         let children = await import("./dashboard");
-        patch("dashboard", children);
+        patch(null, children);
       }
       if (path.startsWith("/account")) {
         let children = await import("./account");
-        patch("account", children);
+        patch(null, children);
       }
     },
   }
@@ -507,32 +499,52 @@ let router = createBrowserRouter(
 If you don't wish to perform your own pseudo-matching, you can leverage the partial `matches` array and the `handle` field on a route to keep the children definitions co-located:
 
 ```jsx
-let router = createBrowserRouter([
+let router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      Component: Home,
+    },
+    {
+      path: "/dashboard",
+      children: [
+        {
+          // If we want to include /dashboard in the critical routes, we need to
+          // also include it's index route since patchRoutesOnMiss will not be
+          // called on a navigation to `/dashboard` because it will have successfully
+          // matched the `/dashboard` parent route
+          index: true,
+          // ...
+        },
+      ],
+      handle: {
+        lazyChildren: () => import("./dashboard"),
+      },
+    },
+    {
+      path: "/account",
+      children: [
+        {
+          index: true,
+          // ...
+        },
+      ],
+      handle: {
+        lazyChildren: () => import("./account"),
+      },
+    },
+  ],
   {
-    path: "/",
-    Component: Home,
-  },
-  {
-    path: "/dashboard",
-    handle: {
-      lazyChildren: () => import('./dashboard');
-    }
-  },
-  {
-    path: "/account",
-    handle: {
-      lazyChildren: () => import('./account');
-    }
-  },
-], {
-  async unstable_patchRoutesOnMiss({ matches, patch }) {
-    let leafRoute = matches[matches.length - 1]?.route;
-    if (leafRoute?.handle?.lazyChildren) {
-      let children = await leafRoute.handle.lazyChildren();
-      patch(leafRoute.id, children);
-    }
+    async unstable_patchRoutesOnMiss({ matches, patch }) {
+      let leafRoute = matches[matches.length - 1]?.route;
+      if (leafRoute?.handle?.lazyChildren) {
+        let children =
+          await leafRoute.handle.lazyChildren();
+        patch(leafRoute.id, children);
+      }
+    },
   }
-});
+);
 ```
 
 ## `opts.window`
