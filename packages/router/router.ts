@@ -36,6 +36,7 @@ import type {
   V7_FormMethod,
   V7_MutationFormMethod,
   AgnosticPatchRoutesOnMissFunction,
+  DataWithResponseInit,
 } from "./utils";
 import {
   ErrorResponseImpl,
@@ -847,7 +848,7 @@ export function createRouter(init: RouterInit): Router {
   // In SSR apps (with `hydrationData`), we expect that the server will send
   // up the proper matched routes so we don't want to run lazy discovery on
   // initial hydration and want to hydrate into the splat route.
-  if (initialMatches && patchRoutesOnMissImpl && !init.hydrationData) {
+  if (initialMatches && !init.hydrationData) {
     let fogOfWar = checkFogOfWar(
       initialMatches,
       dataRoutes,
@@ -860,9 +861,22 @@ export function createRouter(init: RouterInit): Router {
 
   let initialized: boolean;
   if (!initialMatches) {
-    // We need to run patchRoutesOnMiss in initialize()
     initialized = false;
     initialMatches = [];
+
+    // If partial hydration and fog of war is enabled, we will be running
+    // `patchRoutesOnMiss` during hydration so include any partial matches as
+    // the initial matches so we can properly render `HydrateFallback`'s
+    if (future.v7_partialHydration) {
+      let fogOfWar = checkFogOfWar(
+        null,
+        dataRoutes,
+        init.history.location.pathname
+      );
+      if (fogOfWar.active && fogOfWar.matches) {
+        initialMatches = fogOfWar.matches;
+      }
+    }
   } else if (initialMatches.some((m) => m.route.lazy)) {
     // All initialMatches need to be loaded before we're ready.  If we have lazy
     // functions around still then we'll need to run them in initialize()
@@ -967,7 +981,7 @@ export function createRouter(init: RouterInit): Router {
 
   // Use this internal array to capture fetcher loads that were cancelled by an
   // action navigation and require revalidation
-  let cancelledFetcherLoads: string[] = [];
+  let cancelledFetcherLoads: Set<string> = new Set();
 
   // AbortControllers for any in-flight fetchers
   let fetchControllers = new Map<string, AbortController>();
@@ -1320,7 +1334,6 @@ export function createRouter(init: RouterInit): Router {
     isUninterruptedRevalidation = false;
     isRevalidationRequired = false;
     cancelledDeferredRoutes = [];
-    cancelledFetcherLoads = [];
   }
 
   // Trigger a navigation event, which can either be a numerical POP or a PUSH
@@ -2689,7 +2702,9 @@ export function createRouter(init: RouterInit): Router {
     pendingNavigationController = null;
 
     let redirectHistoryAction =
-      replace === true ? HistoryAction.Replace : HistoryAction.Push;
+      replace === true || redirect.response.headers.has("X-Remix-Replace")
+        ? HistoryAction.Replace
+        : HistoryAction.Push;
 
     // Use the incoming submission if provided, fallback on the active one in
     // state.navigation
@@ -2857,7 +2872,7 @@ export function createRouter(init: RouterInit): Router {
     // Abort in-flight fetcher loads
     fetchLoadMatches.forEach((_, key) => {
       if (fetchControllers.has(key)) {
-        cancelledFetcherLoads.push(key);
+        cancelledFetcherLoads.add(key);
         abortFetcher(key);
       }
     });
@@ -2921,6 +2936,7 @@ export function createRouter(init: RouterInit): Router {
     fetchReloadIds.delete(key);
     fetchRedirectIds.delete(key);
     deletedFetchers.delete(key);
+    cancelledFetcherLoads.delete(key);
     state.fetchers.delete(key);
   }
 
@@ -4314,7 +4330,7 @@ function getMatchesToLoad(
   skipActionErrorRevalidation: boolean,
   isRevalidationRequired: boolean,
   cancelledDeferredRoutes: string[],
-  cancelledFetcherLoads: string[],
+  cancelledFetcherLoads: Set<string>,
   deletedFetchers: Set<string>,
   fetchLoadMatches: Map<string, FetchLoadMatch>,
   fetchRedirectIds: Set<string>,
@@ -4449,8 +4465,9 @@ function getMatchesToLoad(
     if (fetchRedirectIds.has(key)) {
       // Never trigger a revalidation of an actively redirecting fetcher
       shouldRevalidate = false;
-    } else if (cancelledFetcherLoads.includes(key)) {
-      // Always revalidate if the fetcher was cancelled
+    } else if (cancelledFetcherLoads.has(key)) {
+      // Always mark for revalidation if the fetcher was cancelled
+      cancelledFetcherLoads.delete(key);
       shouldRevalidate = true;
     } else if (
       fetcher &&
@@ -4910,7 +4927,7 @@ async function callLoaderOrAction(
 async function convertHandlerResultToDataResult(
   handlerResult: HandlerResult
 ): Promise<DataResult> {
-  let { result, type, status } = handlerResult;
+  let { result, type } = handlerResult;
 
   if (isResponse(result)) {
     let data: any;
@@ -4950,10 +4967,26 @@ async function convertHandlerResultToDataResult(
   }
 
   if (type === ResultType.error) {
+    if (isDataWithResponseInit(result)) {
+      if (result.data instanceof Error) {
+        return {
+          type: ResultType.error,
+          error: result.data,
+          statusCode: result.init?.status,
+        };
+      }
+
+      // Convert thrown unstable_data() to ErrorResponse instances
+      result = new ErrorResponseImpl(
+        result.init?.status || 500,
+        undefined,
+        result.data
+      );
+    }
     return {
       type: ResultType.error,
       error: result,
-      statusCode: isRouteErrorResponse(result) ? result.status : status,
+      statusCode: isRouteErrorResponse(result) ? result.status : undefined,
     };
   }
 
@@ -4966,7 +4999,18 @@ async function convertHandlerResultToDataResult(
     };
   }
 
-  return { type: ResultType.data, data: result, statusCode: status };
+  if (isDataWithResponseInit(result)) {
+    return {
+      type: ResultType.data,
+      data: result.data,
+      statusCode: result.init?.status,
+      headers: result.init?.headers
+        ? new Headers(result.init.headers)
+        : undefined,
+    };
+  }
+
+  return { type: ResultType.data, data: result };
 }
 
 // Support relative routing in internal redirects
@@ -5479,6 +5523,19 @@ function isErrorResult(result: DataResult): result is ErrorResult {
 
 function isRedirectResult(result?: DataResult): result is RedirectResult {
   return (result && result.type) === ResultType.redirect;
+}
+
+export function isDataWithResponseInit(
+  value: any
+): value is DataWithResponseInit<unknown> {
+  return (
+    typeof value === "object" &&
+    value != null &&
+    "type" in value &&
+    "data" in value &&
+    "init" in value &&
+    value.type === "DataWithResponseInit"
+  );
 }
 
 export function isDeferredData(value: any): value is DeferredData {
