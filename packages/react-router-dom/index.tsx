@@ -16,7 +16,8 @@ import type {
   RouterProps,
   RouterProviderProps,
   To,
-  unstable_PatchRoutesOnMissFunction,
+  unstable_DataStrategyFunction,
+  unstable_PatchRoutesOnNavigationFunction,
 } from "react-router";
 import {
   Router,
@@ -38,9 +39,6 @@ import {
 } from "react-router";
 import type {
   BrowserHistory,
-  unstable_DataStrategyFunction,
-  unstable_DataStrategyFunctionArgs,
-  unstable_DataStrategyMatch,
   Fetcher,
   FormEncType,
   FormMethod,
@@ -89,9 +87,6 @@ import {
 ////////////////////////////////////////////////////////////////////////////////
 
 export type {
-  unstable_DataStrategyFunction,
-  unstable_DataStrategyFunctionArgs,
-  unstable_DataStrategyMatch,
   FormEncType,
   FormMethod,
   GetScrollRestorationKeyFunction,
@@ -111,6 +106,10 @@ export type {
   BlockerFunction,
   DataRouteMatch,
   DataRouteObject,
+  unstable_DataStrategyFunction,
+  unstable_DataStrategyFunctionArgs,
+  unstable_DataStrategyMatch,
+  unstable_DataStrategyResult,
   ErrorResponse,
   Fetcher,
   FutureConfig,
@@ -152,8 +151,7 @@ export type {
   ShouldRevalidateFunctionArgs,
   To,
   UIMatch,
-  unstable_HandlerResult,
-  unstable_PatchRoutesOnMissFunction,
+  unstable_PatchRoutesOnNavigationFunction,
 } from "react-router";
 export {
   AbortedDeferredError,
@@ -261,7 +259,7 @@ interface DOMRouterOpts {
   future?: Partial<Omit<RouterFutureConfig, "v7_prependBasename">>;
   hydrationData?: HydrationState;
   unstable_dataStrategy?: unstable_DataStrategyFunction;
-  unstable_patchRoutesOnMiss?: unstable_PatchRoutesOnMissFunction;
+  unstable_patchRoutesOnNavigation?: unstable_PatchRoutesOnNavigationFunction;
   window?: Window;
 }
 
@@ -280,7 +278,7 @@ export function createBrowserRouter(
     routes,
     mapRouteProperties,
     unstable_dataStrategy: opts?.unstable_dataStrategy,
-    unstable_patchRoutesOnMiss: opts?.unstable_patchRoutesOnMiss,
+    unstable_patchRoutesOnNavigation: opts?.unstable_patchRoutesOnNavigation,
     window: opts?.window,
   }).initialize();
 }
@@ -300,7 +298,7 @@ export function createHashRouter(
     routes,
     mapRouteProperties,
     unstable_dataStrategy: opts?.unstable_dataStrategy,
-    unstable_patchRoutesOnMiss: opts?.unstable_patchRoutesOnMiss,
+    unstable_patchRoutesOnNavigation: opts?.unstable_patchRoutesOnNavigation,
     window: opts?.window,
   }).initialize();
 }
