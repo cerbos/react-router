@@ -16,8 +16,8 @@ import type {
   RouterProps,
   RouterProviderProps,
   To,
-  unstable_DataStrategyFunction,
-  unstable_PatchRoutesOnNavigationFunction,
+  DataStrategyFunction,
+  PatchRoutesOnNavigationFunction,
 } from "react-router";
 import {
   Router,
@@ -106,10 +106,10 @@ export type {
   BlockerFunction,
   DataRouteMatch,
   DataRouteObject,
-  unstable_DataStrategyFunction,
-  unstable_DataStrategyFunctionArgs,
-  unstable_DataStrategyMatch,
-  unstable_DataStrategyResult,
+  DataStrategyFunction,
+  DataStrategyFunctionArgs,
+  DataStrategyMatch,
+  DataStrategyResult,
   ErrorResponse,
   Fetcher,
   FutureConfig,
@@ -132,6 +132,8 @@ export type {
   OutletProps,
   Params,
   ParamParseKey,
+  PatchRoutesOnNavigationFunction,
+  PatchRoutesOnNavigationFunctionArgs,
   Path,
   PathMatch,
   Pathname,
@@ -151,7 +153,6 @@ export type {
   ShouldRevalidateFunctionArgs,
   To,
   UIMatch,
-  unstable_PatchRoutesOnNavigationFunction,
 } from "react-router";
 export {
   AbortedDeferredError,
@@ -258,8 +259,8 @@ interface DOMRouterOpts {
   basename?: string;
   future?: Partial<Omit<RouterFutureConfig, "v7_prependBasename">>;
   hydrationData?: HydrationState;
-  unstable_dataStrategy?: unstable_DataStrategyFunction;
-  unstable_patchRoutesOnNavigation?: unstable_PatchRoutesOnNavigationFunction;
+  dataStrategy?: DataStrategyFunction;
+  patchRoutesOnNavigation?: PatchRoutesOnNavigationFunction;
   window?: Window;
 }
 
@@ -277,8 +278,8 @@ export function createBrowserRouter(
     hydrationData: opts?.hydrationData || parseHydrationData(),
     routes,
     mapRouteProperties,
-    unstable_dataStrategy: opts?.unstable_dataStrategy,
-    unstable_patchRoutesOnNavigation: opts?.unstable_patchRoutesOnNavigation,
+    dataStrategy: opts?.dataStrategy,
+    patchRoutesOnNavigation: opts?.patchRoutesOnNavigation,
     window: opts?.window,
   }).initialize();
 }
@@ -297,8 +298,8 @@ export function createHashRouter(
     hydrationData: opts?.hydrationData || parseHydrationData(),
     routes,
     mapRouteProperties,
-    unstable_dataStrategy: opts?.unstable_dataStrategy,
-    unstable_patchRoutesOnNavigation: opts?.unstable_patchRoutesOnNavigation,
+    dataStrategy: opts?.dataStrategy,
+    patchRoutesOnNavigation: opts?.patchRoutesOnNavigation,
     window: opts?.window,
   }).initialize();
 }
@@ -519,8 +520,8 @@ export function RouterProvider({
       newState: RouterState,
       {
         deletedFetchers,
-        unstable_flushSync: flushSync,
-        unstable_viewTransitionOpts: viewTransitionOpts,
+        flushSync: flushSync,
+        viewTransitionOpts: viewTransitionOpts,
       }
     ) => {
       deletedFetchers.forEach((key) => fetcherData.current.delete(key));
@@ -930,7 +931,7 @@ export interface LinkProps
   preventScrollReset?: boolean;
   relative?: RelativeRoutingType;
   to: To;
-  unstable_viewTransition?: boolean;
+  viewTransition?: boolean;
 }
 
 const isBrowser =
@@ -954,7 +955,7 @@ export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       target,
       to,
       preventScrollReset,
-      unstable_viewTransition,
+      viewTransition,
       ...rest
     },
     ref
@@ -1004,7 +1005,7 @@ export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       target,
       preventScrollReset,
       relative,
-      unstable_viewTransition,
+      viewTransition,
     });
     function handleClick(
       event: React.MouseEvent<HTMLAnchorElement, MouseEvent>
@@ -1061,7 +1062,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
       end = false,
       style: styleProp,
       to,
-      unstable_viewTransition,
+      viewTransition,
       children,
       ...rest
     },
@@ -1076,7 +1077,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
       // Conditional usage is OK here because the usage of a data router is static
       // eslint-disable-next-line react-hooks/rules-of-hooks
       useViewTransitionState(path) &&
-      unstable_viewTransition === true;
+      viewTransition === true;
 
     let toPathname = navigator.encodeLocation
       ? navigator.encodeLocation(path).pathname
@@ -1160,7 +1161,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
         ref={ref}
         style={style}
         to={to}
-        unstable_viewTransition={unstable_viewTransition}
+        viewTransition={viewTransition}
       >
         {typeof children === "function" ? children(renderProps) : children}
       </Link>
@@ -1255,7 +1256,7 @@ export interface FormProps extends SharedFormProps {
   /**
    * Enable view transitions on this Form navigation
    */
-  unstable_viewTransition?: boolean;
+  viewTransition?: boolean;
 }
 
 type HTMLSubmitEvent = React.BaseSyntheticEvent<
@@ -1285,7 +1286,7 @@ export const Form = React.forwardRef<HTMLFormElement, FormProps>(
       onSubmit,
       relative,
       preventScrollReset,
-      unstable_viewTransition,
+      viewTransition,
       ...props
     },
     forwardedRef
@@ -1315,7 +1316,7 @@ export const Form = React.forwardRef<HTMLFormElement, FormProps>(
         state,
         relative,
         preventScrollReset,
-        unstable_viewTransition,
+        viewTransition,
       });
     };
 
@@ -1410,14 +1411,14 @@ export function useLinkClickHandler<E extends Element = HTMLAnchorElement>(
     state,
     preventScrollReset,
     relative,
-    unstable_viewTransition,
+    viewTransition,
   }: {
     target?: React.HTMLAttributeAnchorTarget;
     replace?: boolean;
     state?: any;
     preventScrollReset?: boolean;
     relative?: RelativeRoutingType;
-    unstable_viewTransition?: boolean;
+    viewTransition?: boolean;
   } = {}
 ): (event: React.MouseEvent<E, MouseEvent>) => void {
   let navigate = useNavigate();
@@ -1441,7 +1442,7 @@ export function useLinkClickHandler<E extends Element = HTMLAnchorElement>(
           state,
           preventScrollReset,
           relative,
-          unstable_viewTransition,
+          viewTransition,
         });
       }
     },
@@ -1455,7 +1456,7 @@ export function useLinkClickHandler<E extends Element = HTMLAnchorElement>(
       to,
       preventScrollReset,
       relative,
-      unstable_viewTransition,
+      viewTransition,
     ]
   );
 }
@@ -1585,7 +1586,7 @@ export function useSubmit(): SubmitFunction {
           body,
           formMethod: options.method || (method as HTMLFormMethod),
           formEncType: options.encType || (encType as FormEncType),
-          unstable_flushSync: options.unstable_flushSync,
+          flushSync: options.flushSync,
         });
       } else {
         router.navigate(options.action || action, {
@@ -1597,8 +1598,8 @@ export function useSubmit(): SubmitFunction {
           replace: options.replace,
           state: options.state,
           fromRouteId: currentRouteId,
-          unstable_flushSync: options.unstable_flushSync,
-          unstable_viewTransition: options.unstable_viewTransition,
+          flushSync: options.flushSync,
+          viewTransition: options.viewTransition,
         });
       }
     },
@@ -1634,9 +1635,13 @@ export function useFormAction(
     // since it might not apply to our contextual route.  We add it back based
     // on match.route.index below
     let params = new URLSearchParams(path.search);
-    if (params.has("index") && params.get("index") === "") {
+    let indexValues = params.getAll("index");
+    let hasNakedIndexParam = indexValues.some((v) => v === "");
+    if (hasNakedIndexParam) {
       params.delete("index");
-      path.search = params.toString() ? `?${params.toString()}` : "";
+      indexValues.filter((v) => v).forEach((v) => params.append("index", v));
+      let qs = params.toString();
+      path.search = qs ? `?${qs}` : "";
     }
   }
 
@@ -1663,7 +1668,7 @@ export type FetcherWithComponents<TData> = Fetcher<TData> & {
     FetcherFormProps & React.RefAttributes<HTMLFormElement>
   >;
   submit: FetcherSubmitFunction;
-  load: (href: string, opts?: { unstable_flushSync?: boolean }) => void;
+  load: (href: string, opts?: { flushSync?: boolean }) => void;
 };
 
 // TODO: (v7) Change the useFetcher generic default from `any` to `unknown`
@@ -1713,7 +1718,7 @@ export function useFetcher<TData = any>({
 
   // Fetcher additions
   let load = React.useCallback(
-    (href: string, opts?: { unstable_flushSync?: boolean }) => {
+    (href: string, opts?: { flushSync?: boolean }) => {
       invariant(routeId, "No routeId available for fetcher.load()");
       router.fetch(fetcherKey, routeId, href, opts);
     },
@@ -2006,7 +2011,7 @@ function useViewTransitionState(
 
   invariant(
     vtContext != null,
-    "`unstable_useViewTransitionState` must be used within `react-router-dom`'s `RouterProvider`.  " +
+    "`useViewTransitionState` must be used within `react-router-dom`'s `RouterProvider`.  " +
       "Did you accidentally import `RouterProvider` from `react-router`?"
   );
 
@@ -2029,11 +2034,11 @@ function useViewTransitionState(
   // destination.  This ensures that other PUSH navigations that reverse
   // an indicated transition apply.  I.e., on the list view you have:
   //
-  //   <NavLink to="/details/1" unstable_viewTransition>
+  //   <NavLink to="/details/1" viewTransition>
   //
   // If you click the breadcrumb back to the list view:
   //
-  //   <NavLink to="/list" unstable_viewTransition>
+  //   <NavLink to="/list" viewTransition>
   //
   // We should apply the transition because it's indicated as active going
   // from /list -> /details/1 and therefore should be active on the reverse
@@ -2044,6 +2049,6 @@ function useViewTransitionState(
   );
 }
 
-export { useViewTransitionState as unstable_useViewTransitionState };
+export { useViewTransitionState as useViewTransitionState };
 
 //#endregion
