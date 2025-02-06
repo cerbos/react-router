@@ -356,7 +356,7 @@ export type HydrationState = Partial<
 /**
  * Future flags to toggle new feature behavior
  */
-export interface FutureConfig {}
+export interface FutureConfig { }
 
 /**
  * Initialization options for createRouter
@@ -472,9 +472,9 @@ type BaseSubmissionOptions = {
   formMethod?: HTMLFormMethod;
   formEncType?: FormEncType;
 } & (
-  | { formData: FormData; body?: undefined }
-  | { formData?: undefined; body: any }
-);
+    | { formData: FormData; body?: undefined }
+    | { formData?: undefined; body: any }
+  );
 
 /**
  * Options for a navigate() call for a normal (non-submission) navigation
@@ -787,8 +787,8 @@ export function createRouter(init: RouterInit): Router {
   const routerWindow = init.window
     ? init.window
     : typeof window !== "undefined"
-    ? window
-    : undefined;
+      ? window
+      : undefined;
   const isBrowser =
     typeof routerWindow !== "undefined" &&
     typeof routerWindow.document !== "undefined" &&
@@ -1026,11 +1026,11 @@ export function createRouter(init: RouterInit): Router {
         warning(
           blockerFunctions.size === 0 || delta != null,
           "You are trying to use a blocker on a POP navigation to a location " +
-            "that was not created by @remix-run/router. This will fail silently in " +
-            "production. This can happen if you are navigating outside the router " +
-            "via `window.history.pushState`/`window.location.hash` instead of using " +
-            "router navigation APIs.  This can also happen if you are using " +
-            "createHashRouter and the user manually changes the URL."
+          "that was not created by @remix-run/router. This will fail silently in " +
+          "production. This can happen if you are navigating outside the router " +
+          "via `window.history.pushState`/`window.location.hash` instead of using " +
+          "router navigation APIs.  This can also happen if you are using " +
+          "createHashRouter and the user manually changes the URL."
         );
 
         let blockerKey = shouldBlockNavigation({
@@ -1218,11 +1218,11 @@ export function createRouter(init: RouterInit): Router {
     // Always preserve any existing loaderData from re-used routes
     let loaderData = newState.loaderData
       ? mergeLoaderData(
-          state.loaderData,
-          newState.loaderData,
-          newState.matches || [],
-          newState.errors
-        )
+        state.loaderData,
+        newState.loaderData,
+        newState.matches || [],
+        newState.errors
+      )
       : state.loaderData;
 
     // On a successful navigation we can assume we got through all blockers
@@ -1467,6 +1467,7 @@ export function createRouter(init: RouterInit): Router {
     if (state.navigation.state === "idle") {
       startNavigation(state.historyAction, state.location, {
         startUninterruptedRevalidation: true,
+        isRevalidation: true
       });
       return promise;
     }
@@ -1481,6 +1482,7 @@ export function createRouter(init: RouterInit): Router {
         overrideNavigation: state.navigation,
         // Proxy through any rending view transition
         enableViewTransition: pendingViewTransitionEnabled === true,
+        isRevalidation: true
       }
     );
     return promise;
@@ -1499,6 +1501,7 @@ export function createRouter(init: RouterInit): Router {
       overrideNavigation?: Navigation;
       pendingError?: ErrorResponseImpl;
       startUninterruptedRevalidation?: boolean;
+      isRevalidation?: boolean;
       preventScrollReset?: boolean;
       replace?: boolean;
       enableViewTransition?: boolean;
@@ -1525,11 +1528,11 @@ export function createRouter(init: RouterInit): Router {
     let loadingNavigation = opts && opts.overrideNavigation;
     let matches =
       opts?.initialHydration &&
-      state.matches &&
-      state.matches.length > 0 &&
-      !initialMatchesIsFOW
+        state.matches &&
+        state.matches.length > 0 &&
+        !initialMatchesIsFOW
         ? // `matchRoutes()` has already been called if we're in here via `router.initialize()`
-          state.matches
+        state.matches
         : matchRoutes(routesToUse, location, basename);
     let flushSync = (opts && opts.flushSync) === true;
 
@@ -1583,6 +1586,10 @@ export function createRouter(init: RouterInit): Router {
       opts && opts.submission
     );
     let pendingActionResult: PendingActionResult | undefined;
+
+    if (!opts?.isRevalidation) {
+      request.headers.set("X-Request-Type", "navigation");
+    }
 
     if (opts && opts.pendingError) {
       // If we have a pendingError, it means the user attempted a GET submission
@@ -2996,10 +3003,10 @@ export function createRouter(init: RouterInit): Router {
     // https://mermaid.live/edit#pako:eNqVkc9OwzAMxl8l8nnjAYrEtDIOHEBIgwvKJTReGy3_lDpIqO27k6awMG0XcrLlnz87nwdonESogKXXBuE79rq75XZO3-yHds0RJVuv70YrPlUrCEe2HfrORS3rubqZfuhtpg5C9wk5tZ4VKcRUq88q9Z8RS0-48cE1iHJkL0ugbHuFLus9L6spZy8nX9MP2CNdomVaposqu3fGayT8T8-jJQwhepo_UtpgBQaDEUom04dZhAN1aJBDlUKJBxE1ceB2Smj0Mln-IBW5AFU2dwUiktt_2Qaq2dBfaKdEup85UV7Yd-dKjlnkabl2Pvr0DTkTreM
     invariant(
       (blocker.state === "unblocked" && newBlocker.state === "blocked") ||
-        (blocker.state === "blocked" && newBlocker.state === "blocked") ||
-        (blocker.state === "blocked" && newBlocker.state === "proceeding") ||
-        (blocker.state === "blocked" && newBlocker.state === "unblocked") ||
-        (blocker.state === "proceeding" && newBlocker.state === "unblocked"),
+      (blocker.state === "blocked" && newBlocker.state === "blocked") ||
+      (blocker.state === "blocked" && newBlocker.state === "proceeding") ||
+      (blocker.state === "blocked" && newBlocker.state === "unblocked") ||
+      (blocker.state === "proceeding" && newBlocker.state === "unblocked"),
       `Invalid blocker state transition: ${blocker.state} -> ${newBlocker.state}`
     );
 
@@ -3584,10 +3591,10 @@ export function createStaticHandler(
       return isResponse(result)
         ? result
         : {
-            ...result,
-            actionData: null,
-            actionHeaders: {},
-          };
+          ...result,
+          actionData: null,
+          actionHeaders: {},
+        };
     } catch (e) {
       // If the user threw/returned a Response in callLoaderOrAction for a
       // `queryRoute` call, we throw the `DataStrategyResult` to bail out early
@@ -3711,8 +3718,8 @@ export function createStaticHandler(
         statusCode: isRouteErrorResponse(result.error)
           ? result.error.status
           : result.statusCode != null
-          ? result.statusCode
-          : 500,
+            ? result.statusCode
+            : 500,
         actionData: null,
         actionHeaders: {
           ...(result.headers ? { [actionMatch.route.id]: result.headers } : {}),
@@ -3752,9 +3759,9 @@ export function createStaticHandler(
     pendingActionResult?: PendingActionResult
   ): Promise<
     | Omit<
-        StaticHandlerContext,
-        "location" | "basename" | "actionData" | "actionHeaders"
-      >
+      StaticHandlerContext,
+      "location" | "basename" | "actionData" | "actionHeaders"
+    >
     | Response
   > {
     let isRouteRequest = routeMatch != null;
@@ -3775,8 +3782,8 @@ export function createStaticHandler(
     let requestMatches = routeMatch
       ? [routeMatch]
       : pendingActionResult && isErrorResult(pendingActionResult[1])
-      ? getLoaderMatchesUntilBoundary(matches, pendingActionResult[0])
-      : matches;
+        ? getLoaderMatchesUntilBoundary(matches, pendingActionResult[0])
+        : matches;
     let matchesToLoad = requestMatches.filter(
       (m) => m.route.loader || m.route.lazy
     );
@@ -3793,8 +3800,8 @@ export function createStaticHandler(
         errors:
           pendingActionResult && isErrorResult(pendingActionResult[1])
             ? {
-                [pendingActionResult[0]]: pendingActionResult[1].error,
-              }
+              [pendingActionResult[0]]: pendingActionResult[1].error,
+            }
             : null,
         statusCode: 200,
         loaderHeaders: {},
@@ -4071,12 +4078,12 @@ function normalizeNavigateOptions(
           ? opts.body
           : opts.body instanceof FormData ||
             opts.body instanceof URLSearchParams
-          ? // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#plain-text-form-data
+            ? // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#plain-text-form-data
             Array.from(opts.body.entries()).reduce(
               (acc, [name, value]) => `${acc}${name}=${value}\n`,
               ""
             )
-          : String(opts.body);
+            : String(opts.body);
 
       return {
         path,
@@ -4278,12 +4285,12 @@ function getMatchesToLoad(
       defaultShouldRevalidate: shouldSkipRevalidation
         ? false
         : // Forced revalidation due to submission, useRevalidator, or X-Remix-Revalidate
-          isRevalidationRequired ||
-          currentUrl.pathname + currentUrl.search ===
-            nextUrl.pathname + nextUrl.search ||
-          // Search params affect all loaders
-          currentUrl.search !== nextUrl.search ||
-          isNewRouteInstance(currentRouteMatch, nextRouteMatch),
+        isRevalidationRequired ||
+        currentUrl.pathname + currentUrl.search ===
+        nextUrl.pathname + nextUrl.search ||
+        // Search params affect all loaders
+        currentUrl.search !== nextUrl.search ||
+        isNewRouteInstance(currentRouteMatch, nextRouteMatch),
     });
   });
 
@@ -4587,8 +4594,8 @@ async function loadLazyRouteModule(
     warning(
       !isPropertyStaticallyDefined,
       `Route "${routeToUpdate.id}" has a static property "${lazyRouteProperty}" ` +
-        `defined but its lazy function is also returning a value for this property. ` +
-        `The lazy route property "${lazyRouteProperty}" will be ignored.`
+      `defined but its lazy function is also returning a value for this property. ` +
+      `The lazy route property "${lazyRouteProperty}" will be ignored.`
     );
 
     if (
@@ -4664,13 +4671,13 @@ async function callDataStrategyImpl(
       }
       return shouldLoad
         ? callLoaderOrAction(
-            type,
-            request,
-            match,
-            loadRoutePromise,
-            handlerOverride,
-            requestContext
-          )
+          type,
+          request,
+          match,
+          loadRoutePromise,
+          handlerOverride,
+          requestContext
+        )
         : Promise.resolve({ type: ResultType.data, result: undefined });
     };
 
@@ -4732,7 +4739,7 @@ async function callLoaderOrAction(
         return Promise.reject(
           new Error(
             `You cannot call the handler for a route which defines a boolean ` +
-              `"${type}" [routeId: ${match.route.id}]`
+            `"${type}" [routeId: ${match.route.id}]`
           )
         );
       }
@@ -4979,7 +4986,8 @@ function createClientSideRequest(
   submission?: Submission
 ): Request {
   let url = history.createURL(stripHashFromPath(location)).toString();
-  let init: RequestInit = { signal };
+  let headers = new Headers({ "X-Request-Type": "fetch" });
+  let init: RequestInit = { signal, headers };
 
   if (submission && isMutationMethod(submission.formMethod)) {
     let { formMethod, formEncType } = submission;
@@ -4989,7 +4997,7 @@ function createClientSideRequest(
     init.method = formMethod.toUpperCase();
 
     if (formEncType === "application/json") {
-      init.headers = new Headers({ "Content-Type": formEncType });
+      headers.set("Content-Type", formEncType);
       init.body = JSON.stringify(submission.json);
     } else if (formEncType === "text/plain") {
       // Content-Type is inferred (https://fetch.spec.whatwg.org/#dom-request)
@@ -5224,14 +5232,14 @@ function getActionDataForCommit(
   }
   return isErrorResult(pendingActionResult[1])
     ? {
-        // Clear out prior actionData on errors
-        actionData: {},
-      }
+      // Clear out prior actionData on errors
+      actionData: {},
+    }
     : {
-        actionData: {
-          [pendingActionResult[0]]: pendingActionResult[1].data,
-        },
-      };
+      actionData: {
+        [pendingActionResult[0]]: pendingActionResult[1].data,
+      },
+    };
 }
 
 // Find the nearest error boundary, looking upwards from the leaf route (or the
@@ -5259,8 +5267,8 @@ function getShortCircuitMatches(routes: AgnosticDataRouteObject[]): {
     routes.length === 1
       ? routes[0]
       : routes.find((r) => r.index || !r.path || r.path === "/") || {
-          id: `__shim-error-route__`,
-        };
+        id: `__shim-error-route__`,
+      };
 
   return {
     matches: [
@@ -5659,13 +5667,13 @@ function createDeferred<T = unknown>() {
       res(val);
       try {
         await promise;
-      } catch (e) {}
+      } catch (e) { }
     };
     reject = async (error?: Error) => {
       rej(error);
       try {
         await promise;
-      } catch (e) {}
+      } catch (e) { }
     };
   });
   return {
