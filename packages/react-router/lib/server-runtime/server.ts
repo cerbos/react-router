@@ -99,7 +99,7 @@ function derive(build: ServerBuild, mode?: string) {
             "from your `getLoadContext` function.",
         );
         handleError(error);
-        return returnLastResortErrorResponse(error, serverMode);
+        throw error;
       }
       loadContext = initialContext || new RouterContextProvider();
     } else {
@@ -656,7 +656,7 @@ async function handleDocumentRequest(
         );
       } catch (error: any) {
         handleError(error);
-        return returnLastResortErrorResponse(error, serverMode);
+        throw error;
       }
     }
   }
@@ -727,11 +727,11 @@ async function handleResourceRequest(
         "Expected a Response to be returned from resource route handler",
       );
       handleError(newError);
-      return returnLastResortErrorResponse(newError, serverMode);
+      throw error;
     }
 
     handleError(error);
-    return returnLastResortErrorResponse(error, serverMode);
+    throw error;
   }
 }
 
@@ -750,22 +750,6 @@ function errorResponseToJson(
       statusText: errorResponse.statusText,
     },
   );
-}
-
-function returnLastResortErrorResponse(error: any, serverMode?: ServerMode) {
-  let message = "Unexpected Server Error";
-
-  if (serverMode !== ServerMode.Production) {
-    message += `\n\n${String(error)}`;
-  }
-
-  // Good grief folks, get your act together 😂!
-  return new Response(message, {
-    status: 500,
-    headers: {
-      "Content-Type": "text/plain",
-    },
-  });
 }
 
 function unwrapResponse(response: Response) {
