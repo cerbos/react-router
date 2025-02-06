@@ -5,6 +5,7 @@ export async function createRequestInit(
   request: Request,
 ): Promise<RequestInit> {
   let init: RequestInit = { signal: request.signal };
+  const requestType = request.headers.get("X-Request-Type");
 
   if (request.method !== "GET") {
     init.method = request.method;
@@ -29,5 +30,10 @@ export async function createRequestInit(
     }
   }
 
+  if (requestType) {
+    init.headers = init.headers || new Headers({
+      "X-Request-Type": requestType
+    })
+  }
   return init;
 }

@@ -1673,6 +1673,7 @@ export function createRouter(init: RouterInit): Router {
     if (state.navigation.state === "idle") {
       startNavigation(state.historyAction, state.location, {
         startUninterruptedRevalidation: true,
+        isRevalidation: true,
       });
       return promise;
     }
@@ -1687,6 +1688,7 @@ export function createRouter(init: RouterInit): Router {
         overrideNavigation: state.navigation,
         // Proxy through any rending view transition
         enableViewTransition: pendingViewTransitionEnabled === true,
+        isRevalidation: true,
       },
     );
     return promise;
@@ -1705,6 +1707,7 @@ export function createRouter(init: RouterInit): Router {
       overrideNavigation?: Navigation;
       pendingError?: ErrorResponseImpl;
       startUninterruptedRevalidation?: boolean;
+      isRevalidation?: boolean;
       preventScrollReset?: boolean;
       replace?: boolean;
       enableViewTransition?: boolean;
@@ -1794,6 +1797,10 @@ export function createRouter(init: RouterInit): Router {
       ? await init.getContext()
       : new RouterContextProvider();
     let pendingActionResult: PendingActionResult | undefined;
+
+    if (!opts?.isRevalidation) {
+      request.headers.set("X-Request-Type", "navigation");
+    }
 
     if (opts && opts.pendingError) {
       // If we have a pendingError, it means the user attempted a GET submission
@@ -6499,7 +6506,8 @@ function createClientSideRequest(
   submission?: Submission,
 ): Request {
   let url = history.createURL(stripHashFromPath(location)).toString();
-  let init: RequestInit = { signal };
+  let headers = new Headers({ "X-Request-Type": "fetch" });
+  let init: RequestInit = { signal, headers };
 
   if (submission && isMutationMethod(submission.formMethod)) {
     let { formMethod, formEncType } = submission;
@@ -6509,7 +6517,7 @@ function createClientSideRequest(
     init.method = formMethod.toUpperCase();
 
     if (formEncType === "application/json") {
-      init.headers = new Headers({ "Content-Type": formEncType });
+      headers.set("Content-Type", formEncType);
       init.body = JSON.stringify(submission.json);
     } else if (formEncType === "text/plain") {
       // Content-Type is inferred (https://fetch.spec.whatwg.org/#dom-request)
