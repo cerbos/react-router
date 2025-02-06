@@ -29,7 +29,6 @@ import {
   SINGLE_FETCH_REDIRECT_STATUS,
 } from "./single-fetch";
 import { getDocumentHeaders } from "./headers";
-import invariant from "./invariant";
 import type { EntryRoute } from "../dom/ssr/routes";
 
 export type RequestHandler = (
@@ -285,23 +284,23 @@ async function handleSingleFetchRequest(
   let { result, headers, status } =
     request.method !== "GET"
       ? await singleFetchAction(
-          build,
-          serverMode,
-          staticHandler,
-          request,
-          handlerUrl,
-          loadContext,
-          handleError
-        )
+        build,
+        serverMode,
+        staticHandler,
+        request,
+        handlerUrl,
+        loadContext,
+        handleError
+      )
       : await singleFetchLoaders(
-          build,
-          serverMode,
-          staticHandler,
-          request,
-          handlerUrl,
-          loadContext,
-          handleError
-        );
+        build,
+        serverMode,
+        staticHandler,
+        request,
+        handlerUrl,
+        loadContext,
+        handleError
+      );
 
   // Mark all successful responses with a header so we can identify in-flight
   // network errors that are missing this header
@@ -482,7 +481,7 @@ async function handleDocumentRequest(
       );
     } catch (error: any) {
       handleError(error);
-      return returnLastResortErrorResponse(error, serverMode);
+      throw error;
     }
   }
 }
@@ -529,7 +528,7 @@ async function handleResourceRequest(
     }
 
     handleError(error);
-    return returnLastResortErrorResponse(error, serverMode);
+    throw error;
   }
 }
 
@@ -551,22 +550,6 @@ function errorResponseToJson(
       },
     }
   );
-}
-
-function returnLastResortErrorResponse(error: any, serverMode?: ServerMode) {
-  let message = "Unexpected Server Error";
-
-  if (serverMode !== ServerMode.Production) {
-    message += `\n\n${String(error)}`;
-  }
-
-  // Good grief folks, get your act together 😂!
-  return new Response(message, {
-    status: 500,
-    headers: {
-      "Content-Type": "text/plain",
-    },
-  });
 }
 
 function unwrapResponse(response: Response) {
