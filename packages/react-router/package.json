@@ -30,7 +30,6 @@
       "node": {
         "types": "./dist/development/index.d.ts",
         "module": "./dist/development/index.mjs",
-        "module-sync": "./dist/development/index.mjs",
         "default": "./dist/development/index.js"
       },
       "module": {
@@ -50,7 +49,6 @@
       "node": {
         "types": "./dist/development/dom-export.d.ts",
         "module": "./dist/development/dom-export.mjs",
-        "module-sync": "./dist/development/dom-export.mjs",
         "default": "./dist/development/dom-export.js"
       },
       "module": {
