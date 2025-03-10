@@ -1,6 +1,6 @@
 {
   "name": "react-router",
-  "version": "7.2.0",
+  "version": "7.3.0",
   "description": "Declarative routing for React",
   "keywords": [
     "react",
@@ -60,6 +60,10 @@
     },
     "./package.json": "./package.json"
   },
+  "scripts": {
+    "build": "wireit",
+    "typecheck": "tsc"
+  },
   "wireit": {
     "build": {
       "command": "rimraf dist && tsup",
@@ -106,8 +110,5 @@
   ],
   "engines": {
     "node": ">=20.0.0"
-  },
-  "scripts": {
-    "build": "wireit"
   }
 }
