@@ -27,7 +27,7 @@ const discoveredPaths = new Set<string>();
 const URL_LIMIT = 7680;
 
 export function isFogOfWarEnabled(ssr: boolean) {
-  return ssr === true;
+  return false
 }
 
 export function getPartialManifest(
@@ -231,8 +231,8 @@ export async function fetchAndApplyManifestPatches(
         // this detection.
         console.warn(
           "Detected a manifest version mismatch during eager route discovery. " +
-            "The next navigation/fetch to an undiscovered route will result in " +
-            "a new document navigation to sync up with the latest manifest."
+          "The next navigation/fetch to an undiscovered route will result in " +
+          "a new document navigation to sync up with the latest manifest."
         );
         return;
       }
