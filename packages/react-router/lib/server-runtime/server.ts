@@ -138,7 +138,7 @@ export const createRequestHandler: CreateRequestHandlerFunction = (
               `\n\nError: ${e instanceof Error ? e.toString() : e}`
           );
           handleError(error);
-          return returnLastResortErrorResponse(error, serverMode);
+          throw error;
         }
       }
     } else {
