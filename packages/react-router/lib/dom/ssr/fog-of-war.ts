@@ -27,7 +27,7 @@ const discoveredPaths = new Set<string>();
 const URL_LIMIT = 7680;
 
 export function isFogOfWarEnabled(ssr: boolean) {
-  return false;
+  return ssr === true;
 }
 
 export function getPartialManifest(
