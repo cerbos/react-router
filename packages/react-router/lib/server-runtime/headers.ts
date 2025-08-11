@@ -8,8 +8,8 @@ import invariant from "./invariant";
 
 // Version used by v7 framework mode
 export function getDocumentHeaders(
+  context: StaticHandlerContext,
   build: ServerBuild,
-  context: StaticHandlerContext
 ): Headers {
   return getDocumentHeadersImpl(context, (m) => {
     let route = build.routes[m.route.id];
@@ -18,9 +18,10 @@ export function getDocumentHeaders(
   });
 }
 
-function getDocumentHeadersImpl(
+export function getDocumentHeadersImpl(
   context: StaticHandlerContext,
-  getRouteHeadersFn: (match: DataRouteMatch) => ServerRouteModule["headers"]
+  getRouteHeadersFn: (match: DataRouteMatch) => ServerRouteModule["headers"],
+  _defaultHeaders?: Headers,
 ): Headers {
   let boundaryIdx = context.errors
     ? context.matches.findIndex((m) => context.errors![m.route.id])
@@ -49,6 +50,8 @@ function getDocumentHeadersImpl(
       return errorHeaders != null;
     });
   }
+
+  const defaultHeaders = new Headers(_defaultHeaders);
 
   return matches.reduce((parentHeaders, match, idx) => {
     let { id } = match.route;
@@ -88,7 +91,7 @@ function getDocumentHeadersImpl(
             actionHeaders,
             errorHeaders: includeErrorHeaders ? errorHeaders : undefined,
           })
-        : headersFn
+        : headersFn,
     );
 
     // Automatically preserve Set-Cookie headers from bubbled responses,
@@ -101,7 +104,7 @@ function getDocumentHeadersImpl(
     prependCookies(parentHeaders, headers);
 
     return headers;
-  }, new Headers());
+  }, new Headers(defaultHeaders));
 }
 
 function prependCookies(parentHeaders: Headers, childHeaders: Headers): void {
