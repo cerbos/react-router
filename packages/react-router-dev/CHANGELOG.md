@@ -1,5 +1,15 @@
 # `@react-router/dev`
 
+## 7.8.1
+
+### Patch Changes
+
+- Update generated `Route.MetaArgs` type so `loaderData` is only potentially undefined when an `ErrorBoundary` export is present ([#14173](https://github.com/remix-run/react-router/pull/14173))
+- Updated dependencies:
+  - `react-router@7.8.1`
+  - `@react-router/node@7.8.1`
+  - `@react-router/serve@7.8.1`
+
 ## 7.8.0
 
 ### Patch Changes

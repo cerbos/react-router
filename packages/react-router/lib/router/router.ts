@@ -3654,8 +3654,28 @@ export function createStaticHandler(
             return res;
           },
           async (error, routeId) => {
-            if (isResponse(error)) {
+            // Redirects propagate verbatim
+            if (isRedirectResponse(error)) {
               return error;
+            }
+
+            // All other thrown responses during document/data request bubble
+            // to the boundary
+            if (isResponse(error)) {
+              try {
+                error = new ErrorResponseImpl(
+                  error.status,
+                  error.statusText,
+                  await parseResponseBody(error),
+                );
+              } catch (e) {
+                error = e;
+              }
+            }
+
+            if (isDataWithResponseInit(error)) {
+              // Convert thrown data() values to ErrorResponses for the UI
+              error = dataWithResponseInitToErrorResponse(error);
             }
 
             if (renderedStaticContext) {
@@ -3857,8 +3877,9 @@ export function createStaticHandler(
           return res;
         },
         (error) => {
-          if (isRouteErrorResponse(error)) {
-            return Promise.resolve(errorResponseToResponse(error));
+          if (isDataWithResponseInit(error)) {
+            // Convert thrown data() values to Responses for resource routes
+            return Promise.resolve(dataWithResponseInitToResponse(error));
           }
           if (isResponse(error)) {
             return Promise.resolve(error);
@@ -4321,10 +4342,19 @@ export function createStaticHandler(
             basename,
           );
         }
-        if (isResponse(result.result) && isRouteRequest) {
-          // For SSR single-route requests, we want to hand Responses back
-          // directly without unwrapping
-          throw result;
+
+        // For SSR single-route requests, we want to hand Responses back
+        // directly, as well as upgrade data() calls to Response instances
+        // (this allows utilities using data() and be shared between normal and
+        // resource routes).
+        if (isRouteRequest) {
+          if (isResponse(result.result)) {
+            throw result;
+          } else if (isDataWithResponseInit(result.result)) {
+            // Upgrade `data()` to `Response` so utilities using `data()` can be
+            // shared between resource and non-resource routes
+            throw dataWithResponseInitToResponse(result.result);
+          }
         }
 
         dataResults[match.route.id] =
@@ -5396,7 +5426,7 @@ async function defaultDataStrategyWithMiddleware(
 function clientMiddlewareErrorHandler(
   error: unknown,
   routeId: string,
-  matches: AgnosticDataRouteMatch[],
+  matches: DataStrategyMatch[],
   didCallHandler: boolean,
 ): Record<string, DataStrategyResult> {
   if (didCallHandler) {
@@ -5404,14 +5434,19 @@ function clientMiddlewareErrorHandler(
       [routeId]: { type: "error", result: error },
     };
   } else {
-    // We never even got to the handlers, so we've got no data.
-    // Find the boundary at or above the source of the middleware
-    // error or the highest loader. We can't render any UI below
-    // the highest loader since we have no loader data available
+    // We never even got to the handlers, so we might not have data for new routes.
+    // Find the boundary at or above the source of the middleware error or the
+    // highest route that needs to load - we can't render any UI below that since
+    // we won't have valid loader data.
+    let maxBoundaryIdx = Math.min(
+      // Throwing route
+      matches.findIndex((m) => m.route.id === routeId) || 0,
+      // or the shallowest route that needs to load data
+      matches.findIndex((m) => m.unstable_shouldCallHandler()) || 0,
+    );
     let boundaryRouteId = findNearestBoundary(
       matches,
-      matches.find((m) => m.route.id === routeId || m.route.loader)?.route.id ||
-        routeId,
+      matches[maxBoundaryIdx].route.id,
     ).route.id;
     return {
       [boundaryRouteId]: { type: "error", result: error },
@@ -5504,11 +5539,7 @@ async function callServerRouteMiddleware(
       nextResult = result;
       return nextResult;
     } catch (e) {
-      nextResult = await errorHandler(
-        // Convert thrown data() values to ErrorResponses
-        isDataWithResponseInit(e) ? dataWithResponseInitToErrorResponse(e) : e,
-        routeId,
-      );
+      nextResult = await errorHandler(e, routeId);
       return nextResult;
     }
   };
@@ -5543,11 +5574,7 @@ async function callServerRouteMiddleware(
       return nextResult;
     }
   } catch (e) {
-    let response = await errorHandler(
-      // Convert thrown data() values to ErrorResponses
-      isDataWithResponseInit(e) ? dataWithResponseInitToErrorResponse(e) : e,
-      routeId,
-    );
+    let response = await errorHandler(e, routeId);
     return response;
   }
 }
@@ -6026,6 +6053,18 @@ async function callLoaderOrAction({
   return result;
 }
 
+async function parseResponseBody(response: Response) {
+  let contentType = response.headers.get("Content-Type");
+
+  // Check between word boundaries instead of startsWith() due to the last
+  // paragraph of https://httpwg.org/specs/rfc9110.html#field.content-type
+  if (contentType && /\bapplication\/json\b/.test(contentType)) {
+    return response.body == null ? null : response.json();
+  }
+
+  return response.text();
+}
+
 async function convertDataStrategyResultToDataResult(
   dataStrategyResult: DataStrategyResult,
 ): Promise<DataResult> {
@@ -6035,18 +6074,7 @@ async function convertDataStrategyResultToDataResult(
     let data: any;
 
     try {
-      let contentType = result.headers.get("Content-Type");
-      // Check between word boundaries instead of startsWith() due to the last
-      // paragraph of https://httpwg.org/specs/rfc9110.html#field.content-type
-      if (contentType && /\bapplication\/json\b/.test(contentType)) {
-        if (result.body == null) {
-          data = null;
-        } else {
-          data = await result.json();
-        }
-      } else {
-        data = await result.text();
-      }
+      data = await parseResponseBody(result);
     } catch (e) {
       return { type: ResultType.error, error: e };
     }
@@ -6579,10 +6607,7 @@ function isHashChangeOnly(a: Location, b: Location): boolean {
 function dataWithResponseInitToResponse<D>(
   data: DataWithResponseInit<D>,
 ): Response {
-  return new Response(
-    typeof data.data === "string" ? data.data : JSON.stringify(data.data),
-    data.init || undefined,
-  );
+  return Response.json(data.data, data.init ?? undefined);
 }
 
 function dataWithResponseInitToErrorResponse<D>(
@@ -6592,16 +6617,6 @@ function dataWithResponseInitToErrorResponse<D>(
     data.init?.status ?? 500,
     data.init?.statusText ?? "Internal Server Error",
     data.data,
-  );
-}
-
-function errorResponseToResponse(error: ErrorResponse): Response {
-  return new Response(
-    typeof error.data === "string" ? error.data : JSON.stringify(error.data),
-    {
-      status: error.status,
-      statusText: error.statusText,
-    },
   );
 }
 
