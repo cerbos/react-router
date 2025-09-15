@@ -83,11 +83,13 @@ type ServerBundlesBuildManifest = BaseBuildManifest & {
 
 type ServerModuleFormat = "esm" | "cjs";
 
+type ValidateConfigFunction = (config: ReactRouterConfig) => string | void;
+
 interface FutureConfig {
   /**
    * Enable route middleware
    */
-  unstable_middleware: boolean;
+  v8_middleware: boolean;
   unstable_optimizeDeps: boolean;
   /**
    * Automatically split route modules into multiple chunks when possible.
@@ -343,6 +345,8 @@ type Result<T> =
       error: string;
     };
 
+type ConfigResult = Result<ResolvedReactRouterConfig>;
+
 function ok<T>(value: T): Result<T> {
   return { ok: true, value };
 }
@@ -356,12 +360,14 @@ async function resolveConfig({
   viteNodeContext,
   reactRouterConfigFile,
   skipRoutes,
+  validateConfig,
 }: {
   root: string;
   viteNodeContext: ViteNode.Context;
   reactRouterConfigFile?: string;
   skipRoutes?: boolean;
-}): Promise<Result<ResolvedReactRouterConfig>> {
+  validateConfig?: ValidateConfigFunction;
+}): Promise<ConfigResult> {
   let reactRouterUserConfig: ReactRouterConfig = {};
 
   if (reactRouterConfigFile) {
@@ -383,6 +389,13 @@ async function resolveConfig({
       }
 
       reactRouterUserConfig = configModule.default;
+
+      if (validateConfig) {
+        const error = validateConfig(reactRouterUserConfig);
+        if (error) {
+          return err(error);
+        }
+      }
     } catch (error) {
       return err(`Error loading ${reactRouterConfigFile}: ${error}`);
     }
@@ -495,7 +508,7 @@ async function resolveConfig({
   let appDirectory = Path.resolve(root, userAppDirectory || "app");
   let buildDirectory = Path.resolve(root, userBuildDirectory);
 
-  let rootRouteFile = findEntry(appDirectory, "root");
+  let rootRouteFile = findEntry(appDirectory, "root", { absolute: true });
   if (!rootRouteFile) {
     let rootRouteDisplayPath = Path.relative(
       root,
@@ -545,7 +558,7 @@ async function resolveConfig({
         {
           id: "root",
           path: "",
-          file: rootRouteFile,
+          file: Path.relative(appDirectory, rootRouteFile),
           children: result.routeConfig,
         },
       ];
@@ -574,8 +587,7 @@ async function resolveConfig({
   }
 
   let future: FutureConfig = {
-    unstable_middleware:
-      reactRouterUserConfig.future?.unstable_middleware ?? false,
+    v8_middleware: reactRouterUserConfig.future?.v8_middleware ?? false,
     unstable_optimizeDeps:
       reactRouterUserConfig.future?.unstable_optimizeDeps ?? false,
     unstable_splitRouteModules:
@@ -612,7 +624,7 @@ async function resolveConfig({
 type ChokidarEventName = ChokidarEmitArgs[0];
 
 type ChangeHandler = (args: {
-  result: Result<ResolvedReactRouterConfig>;
+  result: ConfigResult;
   configCodeChanged: boolean;
   routeConfigCodeChanged: boolean;
   configChanged: boolean;
@@ -622,7 +634,7 @@ type ChangeHandler = (args: {
 }) => void;
 
 export type ConfigLoader = {
-  getConfig: () => Promise<Result<ResolvedReactRouterConfig>>;
+  getConfig: () => Promise<ConfigResult>;
   onChange: (handler: ChangeHandler) => () => void;
   close: () => Promise<void>;
 };
@@ -632,11 +644,13 @@ export async function createConfigLoader({
   watch,
   mode,
   skipRoutes,
+  validateConfig,
 }: {
   watch: boolean;
   rootDirectory?: string;
   mode: string;
   skipRoutes?: boolean;
+  validateConfig?: ValidateConfigFunction;
 }): Promise<ConfigLoader> {
   root = Path.normalize(root ?? process.env.REACT_ROUTER_ROOT ?? process.cwd());
 
@@ -661,7 +675,13 @@ export async function createConfigLoader({
   updateReactRouterConfigFile();
 
   let getConfig = () =>
-    resolveConfig({ root, viteNodeContext, reactRouterConfigFile, skipRoutes });
+    resolveConfig({
+      root,
+      viteNodeContext,
+      reactRouterConfigFile,
+      skipRoutes,
+      validateConfig,
+    });
 
   let appDirectory: string;
 

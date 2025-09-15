@@ -78,7 +78,7 @@ export default function MyRouteComponent({
 }
 ```
 
-## `unstable_middleware`
+## `middleware`
 
 Route [middleware][middleware] runs sequentially on the server before and after document and
 data requests. This gives you a singular place to do things like logging,
@@ -103,7 +103,7 @@ async function loggingMiddleware(
   return response;
 }
 
-export const unstable_middleware = [loggingMiddleware];
+export const middleware = [loggingMiddleware];
 ```
 
 Here's an example middleware to check for logged in users and set the user in
@@ -125,19 +125,19 @@ async function authMiddleware ({
   context.set(userContext, user);
 };
 
-export const unstable_middleware = [authMiddleware];
+export const middleware = [authMiddleware];
 ```
 
 <docs-warning>Please make sure you understand [when middleware runs][when-middleware-runs] to make sure your application will behave the way you intend when adding middleware to your routes.</docs-warning>
 
 See also:
 
-- [`unstable_middleware` params][middleware-params]
+- [`middleware` params][middleware-params]
 - [Middleware][middleware]
 
-## `unstable_clientMiddleware`
+## `clientMiddleware`
 
-This is the client-side equivalent of `unstable_middleware` and runs in the browser during client navigations. The only difference from server middleware is that client middleware doesn't return Responses because they're not wrapping an HTTP request on the server.
+This is the client-side equivalent of `middleware` and runs in the browser during client navigations. The only difference from server middleware is that client middleware doesn't return Responses because they're not wrapping an HTTP request on the server.
 
 Here's an example middleware to log requests on the client:
 
@@ -158,9 +158,7 @@ async function loggingMiddleware(
   // ✅ No need to return anything
 }
 
-export const unstable_clientMiddleware = [
-  loggingMiddleware,
-];
+export const clientMiddleware = [loggingMiddleware];
 ```
 
 See also:
@@ -482,7 +480,7 @@ The meta of the last matching route is used, allowing you to override parent rou
 
 ## `shouldRevalidate`
 
-In framework mode, route loaders are automatically revalidated after all navigations and form submissions (this is different from [Data Mode](../data/route-object#shouldrevalidate)). This enables middleware and loaders to share a request context and optimize in different ways than then they would be in Data Mode.
+In framework mode with SSR, route loaders are automatically revalidated after all navigations and form submissions (this is different from [Data Mode][data-mode-should-revalidate]). This enables middleware and loaders to share a request context and optimize in different ways than then they would be in Data Mode.
 
 Defining this function allows you to opt out of revalidation for a route loader for navigations and form submissions.
 
@@ -496,13 +494,15 @@ export function shouldRevalidate(
 }
 ```
 
+When using [SPA Mode][spa-mode], there are no server loaders to call on navigations, so `shouldRevalidate` behaves the same as it does in [Data Mode][data-mode-should-revalidate].
+
 [`ShouldRevalidateFunctionArgs` Reference Documentation ↗](https://api.reactrouter.com/v7/interfaces/react_router.ShouldRevalidateFunctionArgs.html)
 
 ---
 
 Next: [Rendering Strategies](./rendering)
 
-[middleware-params]: https://api.reactrouter.com/v7/types/react_router.unstable_MiddlewareFunction.html
+[middleware-params]: https://api.reactrouter.com/v7/types/react_router.MiddlewareFunction.html
 [middleware]: ../../how-to/middleware
 [when-middleware-runs]: ../../how-to/middleware#when-middleware-runs
 [loader-params]: https://api.reactrouter.com/v7/interfaces/react_router.LoaderFunctionArgs
@@ -517,3 +517,5 @@ Next: [Rendering Strategies](./rendering)
 [meta-element]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta
 [meta-params]: https://api.reactrouter.com/v7/interfaces/react_router.MetaArgs
 [meta-function]: https://api.reactrouter.com/v7/types/react_router.MetaDescriptor.html
+[data-mode-should-revalidate]: ../data/route-object#shouldrevalidate
+[spa-mode]: ../../how-to/spa
