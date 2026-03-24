@@ -137,7 +137,7 @@
     "react-test-renderer": "^19.1.0",
     "tsup": "catalog:",
     "typescript": "catalog:",
-    "undici": "^6.19.2",
+    "undici": "^6.24.0",
     "wireit": "catalog:"
   },
   "peerDependencies": {
