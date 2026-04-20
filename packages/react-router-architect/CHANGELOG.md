@@ -1,5 +1,14 @@
 # `@react-router/architect`
 
+## v7.14.1
+
+### Patch Changes
+
+- Add TypeScript 6 support to peer dependency ranges
+- Updated dependencies:
+  - [`react-router@7.14.1`](https://github.com/remix-run/react-router/releases/tag/react-router@7.14.1)
+  - [`@react-router/node@7.14.1`](https://github.com/remix-run/react-router/releases/tag/@react-router/node@7.14.1)
+
 ## 7.14.0
 
 ### Patch Changes
@@ -119,7 +128,6 @@
 - Stabilize middleware and context APIs. ([#14215](https://github.com/remix-run/react-router/pull/14215))
 
   We have removed the `unstable_` prefix from the following APIs and they are now considered stable and ready for production use:
-
   - [`RouterContextProvider`](https://reactrouter.com/api/utils/RouterContextProvider)
   - [`createContext`](https://reactrouter.com/api/utils/createContext)
   - `createBrowserRouter` [`getContext`](https://reactrouter.com/api/data-routers/createBrowserRouter#optsgetcontext) option
@@ -343,7 +351,6 @@
 ### Major Changes
 
 - For Remix consumers migrating to React Router, the `crypto` global from the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) is now required when using cookie and session APIs. This means that the following APIs are provided from `react-router` rather than platform-specific packages: ([#11837](https://github.com/remix-run/react-router/pull/11837))
-
   - `createCookie`
   - `createCookieSessionStorage`
   - `createMemorySessionStorage`
@@ -352,7 +359,6 @@
   For consumers running older versions of Node, the `installGlobals` function from `@remix-run/node` has been updated to define `globalThis.crypto`, using [Node's `require('node:crypto').webcrypto` implementation.](https://nodejs.org/api/webcrypto.html)
 
   Since platform-specific packages no longer need to implement this API, the following low-level APIs have been removed:
-
   - `createCookieFactory`
   - `createSessionStorageFactory`
   - `createCookieSessionStorageFactory`
