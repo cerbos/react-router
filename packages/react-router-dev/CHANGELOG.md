@@ -1,5 +1,28 @@
 # `@react-router/dev`
 
+## v7.15.0
+
+### Minor Changes
+
+- Stabilize `future.unstable_passThroughRequests` as `future.v8_passThroughRequests` ([a993f09](https://github.com/remix-run/react-router/commit/a993f09))
+
+  - ⚠️ This is a breaking change if you have already opted into the unstable version - you will need to update your code accordingly
+
+- Stabilize `prerender.unstable_concurrency` as `prerender.concurrency` ([a993f09](https://github.com/remix-run/react-router/commit/a993f09))
+
+  - ⚠️ This is a breaking change if you have already opted into the unstable version - you will need to update your code accordingly
+
+- Stabilize `future.unstable_subResourceIntegrity` as a top-level `subResourceIntegrity` config option in `react-router.config.ts` ([a993f09](https://github.com/remix-run/react-router/commit/a993f09))
+
+  - ⚠️ This is a breaking change if you have already opted into the unstable version - you will need to update your code accordingly
+
+### Patch Changes
+
+- Updated dependencies:
+  - [`react-router@7.15.0`](https://github.com/remix-run/react-router/releases/tag/react-router@7.15.0)
+  - [`@react-router/node@7.15.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/node@7.15.0)
+  - [`@react-router/serve@7.15.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/serve@7.15.0)
+
 ## v7.14.2
 
 ### Patch Changes
@@ -11,11 +34,11 @@
 
 ### Unstable Changes
 
-⚠️  _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
+⚠️ _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
 
 - For `unstable_reactRouterRSC` Vite plugin consumers, require `@vitejs/plugin-react` in user Vite config, and more reliably split route modules. ([#14965](https://github.com/remix-run/react-router/pull/14965)) ([[aabf4a1](https://github.com/remix-run/react-router/commit/aabf4a1))
-
   - ⚠️ This is a breaking change if you have begun using the `unstable_reactRouterRSC` Vite plugin - please install `@vitejs/plugin-react` and add the `react` plugin to your Vite plugins array.
+
 - Updated dependencies:
   - [`react-router@7.14.2`](https://github.com/remix-run/react-router/releases/tag/react-router@7.14.2)
   - [`@react-router/node@7.14.2`](https://github.com/remix-run/react-router/releases/tag/@react-router/node@7.14.2)
