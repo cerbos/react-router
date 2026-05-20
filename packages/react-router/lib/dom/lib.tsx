@@ -122,7 +122,10 @@ try {
       // @ts-expect-error
       REACT_ROUTER_VERSION;
   }
-} catch (e) {
+} catch (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  e
+) {
   // no-op
 }
 //#endregion
@@ -738,7 +741,10 @@ function deserializeErrors(
             // because we don't serialize SSR stack traces for security reasons
             error.stack = "";
             serialized[key] = error;
-          } catch (e) {
+          } catch (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            e
+          ) {
             // no-op - fall through and create a normal Error
           }
         }
@@ -2628,7 +2634,7 @@ export function useSubmit(): SubmitFunction {
  * This is used internally by {@link Form} to resolve the `action` to the closest
  * route, but can be used generically as well.
  *
- * @example
+ * ```ts
  * import { useFormAction } from "react-router";
  *
  * function SomeComponent() {
@@ -2638,6 +2644,14 @@ export function useSubmit(): SubmitFunction {
  *   // closest route URL + "destroy"
  *   let destroyAction = useFormAction("destroy");
  * }
+ * ```
+ *
+ * <docs-info>This hook adds a `basename` if your app specifies one, so that it
+ * can be used with raw `<form>` elements in a progressively enhanced way.  If
+ * you are using this to provide an `action` to `<Form>` or `fetcher.submit`, you
+ * will need to remove the `basename` since both of those will prepend it
+ * internally.</docs-info>
+ *
  *
  * @public
  * @category Hooks
@@ -3000,10 +3014,14 @@ export function useFetcher<T = any>({
  */
 export function useFetchers(): (Fetcher & { key: string })[] {
   let state = useDataRouterState(DataRouterStateHook.UseFetchers);
-  return Array.from(state.fetchers.entries()).map(([key, fetcher]) => ({
-    ...fetcher,
-    key,
-  }));
+  return React.useMemo(
+    () =>
+      Array.from(state.fetchers.entries()).map(([key, fetcher]) => ({
+        ...fetcher,
+        key,
+      })),
+    [state.fetchers],
+  );
 }
 
 const SCROLL_RESTORATION_STORAGE_KEY = "react-router-scroll-positions";
@@ -3115,7 +3133,10 @@ export function useScrollRestoration({
         if (sessionPositions) {
           savedScrollPositions = JSON.parse(sessionPositions);
         }
-      } catch (e) {
+      } catch (
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        e
+      ) {
         // no-op, use default empty object
       }
     }, [storageKey]);
