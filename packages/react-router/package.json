@@ -1,6 +1,6 @@
 {
   "name": "react-router",
-  "version": "7.16.0",
+  "version": "7.17.0",
   "description": "Declarative routing for React",
   "keywords": [
     "react",
@@ -102,6 +102,7 @@
   },
   "scripts": {
     "build": "wireit",
+    "prepublishOnly": "node ./scripts/copy-docs.mjs",
     "watch": "tsup --watch & tsup --config tsup.config.rsc.ts --watch",
     "typecheck": "tsc"
   },
@@ -150,6 +151,7 @@
   },
   "files": [
     "dist/",
+    "docs/",
     "CHANGELOG.md",
     "LICENSE.md",
     "README.md"
