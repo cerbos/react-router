@@ -1,5 +1,22 @@
 # `@react-router/dev`
 
+## v7.18.0
+
+### Patch Changes
+
+- Pass Vite `server.watch` config to child compiler in development mode. ([#15178](https://github.com/remix-run/react-router/pull/15178))
+
+- Ignore external Vite server environments in Framework Mode build hooks ([#14883](https://github.com/remix-run/react-router/pull/14883))
+
+  When `future.v8_viteEnvironmentApi` is enabled, React Router previously treated any non-client Vite environment as its own server build. This caused issues with integrations like Nitro, where plugins can register additional environments.
+
+  Framework Mode build hooks now ignore external server environments and only process the app's own server build.
+
+- Updated dependencies:
+  - [`react-router@7.18.0`](https://github.com/remix-run/react-router/releases/tag/react-router@7.18.0)
+  - [`@react-router/node@7.18.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/node@7.18.0)
+  - [`@react-router/serve@7.18.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/serve@7.18.0)
+
 ## v7.17.0
 
 ### Patch Changes
@@ -8,7 +25,7 @@
 
 ### Unstable Changes
 
-⚠️  _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
+⚠️ _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
 
 - Prevent RSC route module server exports from being scanned by the client dependency optimizer when `future.unstable_optimizeDeps` is enabled. ([#15005](https://github.com/remix-run/react-router/pull/15005))
 - Updated dependencies:

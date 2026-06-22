@@ -3,6 +3,11 @@ import type { MiddlewareEnabled } from "../types/future";
 import type { Equal, Expect } from "../types/utils";
 import type { Location, Path, To } from "./history";
 import { invariant, parsePath, warning } from "./history";
+import {
+  ABSOLUTE_URL_REGEX,
+  normalizeProtocolRelativeUrl,
+  PROTOCOL_RELATIVE_URL_REGEX,
+} from "./url";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -1100,6 +1105,8 @@ interface RouteMeta<RouteObjectType extends RouteObject = RouteObject> {
   caseSensitive: boolean;
   childrenIndex: number;
   route: RouteObjectType;
+  matcher?: RegExp;
+  compiledParams?: CompiledPathParam[];
 }
 
 /**
@@ -1200,9 +1207,21 @@ function flattenRoutes<RouteObjectType extends RouteObject = RouteObject>(
     branches.push({
       path,
       score: computeScore(path, route.index),
-      routesMeta,
+      routesMeta: routesMeta.map((meta, i) => {
+        let [matcher, params] = compilePath(
+          meta.relativePath,
+          meta.caseSensitive,
+          i === routesMeta.length - 1,
+        );
+        return {
+          ...meta,
+          matcher,
+          compiledParams: params,
+        } satisfies RouteMeta<RouteObjectType>;
+      }),
     });
   };
+
   routes.forEach((route, index) => {
     // coarse-grain check for optional params
     if (route.path === "" || !route.path?.includes("?")) {
@@ -1355,10 +1374,21 @@ function matchRouteBranch<
       matchedPathname === "/"
         ? pathname
         : pathname.slice(matchedPathname.length) || "/";
-    let match = matchPath(
-      { path: meta.relativePath, caseSensitive: meta.caseSensitive, end },
-      remainingPathname,
-    );
+    let pattern = {
+      path: meta.relativePath,
+      caseSensitive: meta.caseSensitive,
+      end,
+    };
+    let match =
+      // Use precomputed matcher if it exists
+      meta.matcher && meta.compiledParams
+        ? matchPathImpl(
+            pattern,
+            remainingPathname,
+            meta.matcher,
+            meta.compiledParams,
+          )
+        : matchPath(pattern, remainingPathname);
 
     let route = meta.route;
 
@@ -1541,6 +1571,15 @@ export function matchPath<Path extends string>(
     pattern.end,
   );
 
+  return matchPathImpl(pattern, pathname, matcher, compiledParams);
+}
+
+function matchPathImpl<Path extends string>(
+  pattern: PathPattern<Path>,
+  pathname: string,
+  matcher: RegExp,
+  compiledParams: CompiledPathParam[],
+): PathMatch<ParamParseKey<Path>> | null {
   let match = pathname.match(matcher);
   if (!match) return null;
 
@@ -1706,7 +1745,6 @@ export function prependBasename({
   return pathname === "/" ? basename : joinPaths([basename, pathname]);
 }
 
-const ABSOLUTE_URL_REGEX = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 export const isAbsoluteUrl = (url: string) => ABSOLUTE_URL_REGEX.test(url);
 
 /**
@@ -1901,7 +1939,7 @@ export function resolveTo(
 }
 
 export const removeDoubleSlashes = (path: string): string =>
-  path.replace(/\/\/+/g, "/");
+  path.replace(/[\\/]{2,}/g, "/");
 
 export const joinPaths = (paths: string[]): string =>
   removeDoubleSlashes(paths.join("/"));
@@ -2105,6 +2143,15 @@ export type ErrorResponse = {
   data: any;
 };
 
+export const SUPPORTED_ERROR_TYPES = [
+  "EvalError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "TypeError",
+  "URIError",
+];
+
 /*
  * Utility class we use to hold auto-unwrapped 4xx/5xx Response bodies
  *
@@ -2223,8 +2270,8 @@ export function parseToInfo<T extends To | string>(
   if (isBrowser) {
     try {
       let currentUrl = new URL(window.location.href);
-      let targetUrl = to.startsWith("//")
-        ? new URL(currentUrl.protocol + to)
+      let targetUrl = PROTOCOL_RELATIVE_URL_REGEX.test(to)
+        ? new URL(normalizeProtocolRelativeUrl(to, currentUrl.protocol))
         : new URL(to);
       let path = stripBasename(targetUrl.pathname, basename);
 
