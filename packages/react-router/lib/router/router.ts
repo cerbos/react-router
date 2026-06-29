@@ -31,7 +31,6 @@ import type {
   FormMethod,
   HTMLFormMethod,
   DataStrategyResult,
-  MapRoutePropertiesFunction,
   MaybePromise,
   MutationFormMethod,
   RedirectResult,
@@ -50,6 +49,7 @@ import type {
   MiddlewareNextFunction,
   PatchRoutesOnNavigationFunction,
   RouteBranch,
+  MapRoutePropertiesFunction,
 } from "./utils";
 import {
   ErrorResponseImpl,
@@ -343,7 +343,7 @@ export interface Router {
  * reflect the "old" location unless otherwise noted.
  */
 export interface RouterState {
-  // TODO: (v7) should we consider renaming this `navigationType` to align with
+  // TODO: (v9) should we consider renaming this `navigationType` to align with
   // `useNavigationType` at some point?
   /**
    * The action of the most recent navigation
@@ -921,10 +921,6 @@ export const IDLE_BLOCKER: BlockerUnblocked = {
   location: undefined,
 };
 
-const defaultMapRouteProperties: MapRoutePropertiesFunction = (route) => ({
-  hasErrorBoundary: Boolean(route.hasErrorBoundary),
-});
-
 const TRANSITIONS_STORAGE_KEY = "remix-router-transitions";
 
 // Flag used on new `loaderData` to indicate that we do not want to preserve
@@ -1014,9 +1010,10 @@ export function createRouter(init: RouterInit): Router {
   );
 
   let hydrationRouteProperties = init.hydrationRouteProperties || [];
-  let _mapRouteProperties =
-    init.mapRouteProperties || defaultMapRouteProperties;
-  let mapRouteProperties = _mapRouteProperties;
+  let _mapRouteProperties = init.mapRouteProperties;
+  let mapRouteProperties: MapRoutePropertiesFunction = _mapRouteProperties
+    ? _mapRouteProperties
+    : () => ({});
 
   // Leverage the existing mapRouteProperties logic to execute instrumentRoute
   // (if it exists) on all routes in the application
@@ -1025,7 +1022,7 @@ export function createRouter(init: RouterInit): Router {
 
     mapRouteProperties = (route: DataRouteObject) => {
       return {
-        ..._mapRouteProperties(route),
+        ..._mapRouteProperties?.(route),
         ...getRouteInstrumentationUpdates(
           instrumentations
             .map((i) => i.route)
@@ -2563,7 +2560,7 @@ export function createRouter(init: RouterInit): Router {
     if (pendingActionResult && !isErrorResult(pendingActionResult[1])) {
       // This is cast to `any` currently because `RouteData`uses any and it
       // would be a breaking change to use any.
-      // TODO: v7 - change `RouteData` to use `unknown` instead of `any`
+      // TODO: (v9) change `RouteData` to use `unknown` instead of `any`
       return {
         [pendingActionResult[0]]: pendingActionResult[1].data as any,
       };
@@ -4023,6 +4020,36 @@ export interface CreateStaticHandlerOptions {
   future?: Partial<FutureConfig>;
 }
 
+/**
+ * Create a static handler to perform server-side data loading
+ *
+ * @example
+ * export async function handleRequest(request: Request) {
+ *   let { query, dataRoutes } = createStaticHandler(routes);
+ *   let context = await query(request);
+ *
+ *   if (context instanceof Response) {
+ *     return context;
+ *   }
+ *
+ *   let router = createStaticRouter(dataRoutes, context);
+ *   return new Response(
+ *     ReactDOMServer.renderToString(<StaticRouterProvider ... />),
+ *     { headers: { "Content-Type": "text/html" } }
+ *   );
+ * }
+ *
+ * @public
+ * @category Data Routers
+ * @mode data
+ * @param routes The {@link RouteObject | route objects} to create a static
+ * handler for
+ * @param opts Options
+ * @param opts.basename The base URL for the static handler (default: `/`)
+ * @param opts.future Future flags for the static handler
+ * @returns A static handler that can be used to query data for the provided
+ * routes
+ */
 export function createStaticHandler(
   routes: RouteObject[],
   opts?: CreateStaticHandlerOptions,
@@ -4034,9 +4061,10 @@ export function createStaticHandler(
 
   let manifest: RouteManifest = {};
   let basename = (opts ? opts.basename : null) || "/";
-  let _mapRouteProperties =
-    opts?.mapRouteProperties || defaultMapRouteProperties;
-  let mapRouteProperties = _mapRouteProperties;
+  let _mapRouteProperties = opts?.mapRouteProperties;
+  let mapRouteProperties: MapRoutePropertiesFunction = _mapRouteProperties
+    ? _mapRouteProperties
+    : () => ({});
   // Currently unused in the static handler, but available for additional flags in the future
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let future: FutureConfig = {
@@ -4050,7 +4078,7 @@ export function createStaticHandler(
 
     mapRouteProperties = (route: DataRouteObject) => {
       return {
-        ..._mapRouteProperties(route),
+        ..._mapRouteProperties?.(route),
         ...getRouteInstrumentationUpdates(
           instrumentations
             .map((i) => i.route)
@@ -5442,9 +5470,7 @@ function getMatchesToLoad(
   fetchLoadMatches.forEach((f, key) => {
     // Don't revalidate:
     //  - on initial hydration (shouldn't be any fetchers then anyway)
-    //  - if fetcher won't be present in the subsequent render
-    //    - no longer matches the URL (v7_fetcherPersist=false)
-    //    - was unmounted but persisted due to v7_fetcherPersist=true
+    //  - if fetcher won't be present in the subsequent render (was unmounted but persisted)
     if (
       initialHydration ||
       !matches.some((m) => m.route.id === f.routeId) ||
@@ -5735,9 +5761,9 @@ function patchRoutesImpl(
     for (let i = 0; i < existingChildren.length; i++) {
       let { existingRoute, newRoute } = existingChildren[i];
       let existingRouteTyped = existingRoute as RouteObject;
-      // All this will end up doing for these scenarios is adding `hasErrorBoundary`
-      // to the route.  There's no need for Component->element conversions since
-      // we're already dealing with elements here
+      // This likely ends up being a no-op since there's no need for Component->element
+      // conversions since we're already dealing with elements here.  But kept for
+      // safety and future proofing if we added any more logic to mapRouteProperties
       let [newRouteTyped] = convertRoutesToDataRoutes(
         [newRoute],
         mapRouteProperties,
@@ -5853,8 +5879,7 @@ const loadLazyRouteProperty = ({
   let propertyPromise = (async () => {
     let isUnsupported = isUnsupportedLazyRouteObjectKey(key);
     let staticRouteValue = routeToUpdate[key as keyof typeof routeToUpdate];
-    let isStaticallyDefined =
-      staticRouteValue !== undefined && key !== "hasErrorBoundary";
+    let isStaticallyDefined = staticRouteValue !== undefined;
 
     if (isUnsupported) {
       warning(
@@ -5961,11 +5986,7 @@ function loadLazyRoute(
           isUnsupportedLazyRouteFunctionKey(lazyRouteProperty);
         let staticRouteValue =
           routeToUpdate[lazyRouteProperty as keyof typeof routeToUpdate];
-        let isStaticallyDefined =
-          staticRouteValue !== undefined &&
-          // This property isn't static since it should always be updated based
-          // on the route updates
-          lazyRouteProperty !== "hasErrorBoundary";
+        let isStaticallyDefined = staticRouteValue !== undefined;
 
         if (isUnsupported) {
           warning(
@@ -5990,13 +6011,13 @@ function loadLazyRoute(
       // the updated version to mapRouteProperties
       Object.assign(routeToUpdate, routeUpdates);
 
-      // Mutate the `hasErrorBoundary` property on the route based on the route
-      // updates and remove the `lazy` function so we don't resolve the lazy
-      // route again.
+      // Mutate the route with framework-aware property updates (e.g.,
+      // `Component`->`element` conversions) and remove the `lazy` function so
+      // we don't resolve the lazy route again.
       Object.assign(routeToUpdate, {
         // To keep things framework agnostic, we use the provided `mapRouteProperties`
-        // function to set the framework-aware properties (`element`/`hasErrorBoundary`)
-        // since the logic will differ between frameworks.
+        // function to set framework-aware properties since the logic will
+        // differ between frameworks.
         ...mapRouteProperties(routeToUpdate),
         lazy: undefined,
       });
@@ -6160,17 +6181,15 @@ function runClientMiddlewarePipeline(
   );
 
   // Handle error bubbling on the client
-  function errorHandler(
+  async function errorHandler(
     error: unknown,
     routeId: string,
     nextResult: { value: Record<string, DataStrategyResult> } | undefined,
   ): Promise<Record<string, DataStrategyResult>> {
     if (nextResult) {
-      return Promise.resolve(
-        Object.assign(nextResult.value, {
-          [routeId]: { type: "error", result: error },
-        }),
-      );
+      return Object.assign(nextResult.value, {
+        [routeId]: { type: "error", result: error },
+      });
     } else {
       // We never even got to the handlers, so we might not have data for new routes.
       // Find the boundary at or above the source of the middleware error or the
@@ -6189,13 +6208,25 @@ function runClientMiddlewarePipeline(
           0,
         ),
       );
-      let boundaryRouteId = findNearestBoundary(
-        matches,
-        matches[maxBoundaryIdx].route.id,
-      ).route.id;
-      return Promise.resolve({
+
+      let deepestRouteId = matches[maxBoundaryIdx].route.id;
+
+      // Await lazy route promises before bubbling so any lazy error boundaries
+      // have been loaded
+      for (let match of matches.slice(0, maxBoundaryIdx + 1)) {
+        try {
+          await match._lazyPromises?.route;
+        } catch {
+          deepestRouteId = match.route.id;
+          break;
+        }
+      }
+
+      let boundaryRouteId = findNearestBoundary(matches, deepestRouteId).route
+        .id;
+      return {
         [boundaryRouteId]: { type: "error", result: error },
-      });
+      };
     }
   }
 }
@@ -6591,7 +6622,7 @@ async function callLoaderOrAction({
   let isAction = isMutationMethod(request.method);
   let type = isAction ? "action" : "loader";
   let runHandler = (
-    handler: boolean | LoaderFunction<unknown> | ActionFunction<unknown>,
+    handler: boolean | LoaderFunction<any> | ActionFunction<any>,
   ): Promise<DataStrategyResult> => {
     // Setup a promise we can race against so that abort signals short circuit
     let reject: () => void;
@@ -6944,7 +6975,8 @@ function createDataFunctionUrl(request: Request, path: To): URL {
     for (let value of indexValues.filter(Boolean)) {
       searchParams.append("index", value);
     }
-    url.search = searchParams.size ? `?${searchParams.toString()}` : "";
+    let search = searchParams.toString();
+    url.search = search ? `?${search}` : "";
   } else {
     url.search = "";
   }
@@ -7199,8 +7231,11 @@ function findNearestBoundary(
     ? matches.slice(0, matches.findIndex((m) => m.route.id === routeId) + 1)
     : [...matches];
   return (
-    eligibleMatches.reverse().find((m) => m.route.hasErrorBoundary === true) ||
-    matches[0]
+    eligibleMatches
+      .reverse()
+      .find(
+        (m) => m.route.ErrorBoundary != null || m.route.errorElement != null,
+      ) || matches[0]
   );
 }
 
