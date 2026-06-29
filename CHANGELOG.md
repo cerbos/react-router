@@ -16,6 +16,7 @@ We manage release notes in this file instead of the paginated Github Releases Pa
   <summary>Table of Contents</summary>
 
 - [React Router Releases](#react-router-releases)
+  - [v8.0.1](#v801)
   - [v8.0.0](#v800)
     - [Baseline Support](#baseline-support)
     - [Adopted Future Flag Behavior](#adopted-future-flag-behavior)
@@ -23,6 +24,8 @@ We manage release notes in this file instead of the paginated Github Releases Pa
     - [Removed deprecated `meta` `data` fields](#removed-deprecated-meta-data-fields)
     - [Cloudflare Vite Plugin](#cloudflare-vite-plugin)
     - [`@react-router/architect` `useRequestContextDomainName`](#react-routerarchitect-userequestcontextdomainname)
+    - [Pre-rendering Flow](#pre-rendering-flow)
+- [React Router v7 Releases](#react-router-v7-releases)
   - [v7.18.0](#v7180)
     - [CSRF Check Logic Fix](#csrf-check-logic-fix)
   - [v7.17.0](#v7170)
@@ -101,6 +104,16 @@ We manage release notes in this file instead of the paginated Github Releases Pa
 
 </details>
 
+## v8.0.1
+
+Date: 2026-06-18
+
+### Patch Changes
+
+- `react-router` - Remove the obsolete `AppLoadContext` type export accidentally left over from v7 now that middleware is always enabled and server request context is provided through `RouterContextProvider`. ([#15207](https://github.com/remix-run/react-router/pull/15207))
+
+**Full Changelog**: [`v8.0.0...v8.0.1`](https://github.com/remix-run/react-router/compare/react-router@8.0.0...react-router@8.0.1)
+
 ## v8.0.0
 
 Date: 2026-06-17
@@ -111,7 +124,7 @@ React Router v8 is here!
 
 We introduced a new [Open Governance](https://remix.run/blog/rr-governance) model last year and this marks the first major release on our new planned yearly major release cadence. We chose the June timeframe this year to align with the EOL timeframe for Node 20. Node 22 is [scheduled](https://nodejs.org/en/about/previous-releases) to reach EOL in the May 2027 timeframe so we'll be aiming for a v9 release around the same time next year.
 
-Our [API Development Strategy](https://reactrouter.com/community/api-development-strategy) aims to make major releases relatively boring by introducing breaking changes ahead of time behind [Future flags](https://reactrouter.com/v7/upgrading/future). If you've adopted all active future flags in v7, then from a React Router API surface you're in good shape for v8. All `future.v8_*` flags have been removed (or lifted to a top-level config) and their behaviors are now the default.
+Our [API Development Strategy](https://reactrouter.com/community/api-development-strategy) aims to make major releases relatively boring by introducing breaking changes ahead of time behind [Future Flags](https://reactrouter.com/upgrading/v7). If you've adopted all active future flags in v7, then from a React Router API surface you're in good shape for v8. All `future.v8_*` flags have been removed (or lifted to a top-level config) and their behaviors are now the default.
 
 #### Baseline Support
 
@@ -153,15 +166,33 @@ The React Router Cloudflare dev proxy (`@react-router/dev/vite/cloudflare`) has 
 
 The `@react-router/architect` `createRequestHandler` `useRequestContextDomainName` option has been removed as that is now the default behavior in v8.
 
+#### Pre-rendering Flow
+
+In v7 we had a `future.unstable_previewServerPrerendering` flag that would opt you into a new pre-rendering flow using the Vite preview server (leveraging the Vite environment API). Now that the Vite environment API is always available on our new Vite 7+ baseline, we dropped this flag and the preview server flow has replaced our old pre-rendering implementation. It _should_ be a non-breaking change but if you see issues, please let us know!
+
 ### Major Changes
 
+- `react-router` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
+- `react-router` - Update minimum React version to 19.2.7 ([#15062](https://github.com/remix-run/react-router/pull/15062))
 - `react-router` - Remove the `future.v8_trailingSlashAwareDataRequests` flag ([#15100](https://github.com/remix-run/react-router/pull/15100))
   - Trailing slash-aware data request URLs are now the default behavior.
+- `react-router` - Remove `future.v8_passThroughRequests` flag - the raw incoming `request` is now always passed through to `loader`/`action`. Use `url` for the normalized URL without React Router-specific implementation details (`.data` suffixes, `index`/`_routes` search params). ([#15079](https://github.com/remix-run/react-router/pull/15079))
+- `react-router` - Remove `future.v8_middleware` flag — middleware is always enabled in v8 ([#15078](https://github.com/remix-run/react-router/pull/15078))
+  - The `future.v8_middleware` flag has been removed; middleware is now always enabled
+  - The `context` parameter passed to `loader`, `action`, and `middleware` functions is always a `RouterContextProvider` instance
+  - `getLoadContext` functions in custom servers must return a `RouterContextProvider` — returning a plain object is no longer supported
+  - The `MiddlewareEnabled` type (previously exported as `UNSAFE_MiddlewareEnabled`) has been removed since the conditional it gated is now unconditional
+  - The `Future` module augmentation pattern (`interface Future { v8_middleware: true }`) is no longer needed to type `context` in Data Mode
+- `react-router` - Remove `future.v8_passThroughRequests` flag - the raw incoming `request` is now always passed through to `loader`/`action`. ([#15079](https://github.com/remix-run/react-router/pull/15079))
+- `react-router` - Move `future.v8_splitRouteModules` to a top-level `splitRouteModules` config option and change the default behavior to `true` ([#15086](https://github.com/remix-run/react-router/pull/15086))
+  - Set `splitRouteModules: false` to keep route modules in a single chunk
+  - Set `splitRouteModules: "enforce"` to require all routes to be splittable
+- `@react-router/dev` - Removed the `future.v8_viteEnvironmentApi` flag because the Vite Environment API is always enabled ([#15077](https://github.com/remix-run/react-router/pull/15077))
+- `@react-router/dev` - Removed the `future.unstable_previewServerPrerendering` flag and make prerendering with the Vite Environment API the default. ([#15077](https://github.com/remix-run/react-router/pull/15077))
 - `react-router` - Update `tsconfig.json` `target`/`lib` from `ES2020 -> ES2022` ([591853e](https://github.com/remix-run/react-router/commit/591853e))
 - `react-router` - Switch the published packages in `packages/` to ESM-only. ([#14895](https://github.com/remix-run/react-router/pull/14895)) ([59ebcf1](https://github.com/remix-run/react-router/commit/59ebcf1))
 - `react-router` - Remove deprecated `data` parameter in favor of `loaderData` for `meta` APIs (to align with `Route.ComponentProps`) ([#14931](https://github.com/remix-run/react-router/pull/14931))
   - `Route.MetaArgs`, `Route.MetaMatch`, `MetaArgs`, `MetaMatch`, `Route.ComponentProps.matches`, `UIMatch`
-- `react-router` - Remove `future.v8_passThroughRequests` flag - the raw incoming `request` is now always passed through to `loader`/`action`. Use `url` for the normalized URL without React Router-specific implementation details (`.data` suffixes, `index`/`_routes` search params). ([#15079](https://github.com/remix-run/react-router/pull/15079))
 - `react-router` - Remove internal `hasErrorBoundary` field added to `router.routes` when using a data router ([#15074](https://github.com/remix-run/react-router/pull/15074))
   - This should not impact user-facing code since this was an internal prop and was computed based on the presence of `ErrorBoundary` or `errorElement` on your route
   - `hasErrorBoundary` is no longer accepted on `RouteObject` (`IndexRouteObject`/`NonIndexRouteObject`), `DataRouteObject`, `<Route>` JSX props, or as a key in `lazy` route definitions.
@@ -172,44 +203,19 @@ The `@react-router/architect` `createRequestHandler` `useRequestContextDomainNam
   - For v8, you will need to swap `react-router-dom` imports:
     - `RouterProvider`/`HydratedRouter` should be imported from `react-router/dom`
     - Everything else should be imported from `react-router`
-- `react-router` - Remove `future.v8_middleware` flag — middleware is always enabled in v8 ([#15078](https://github.com/remix-run/react-router/pull/15078))
-  - The `future.v8_middleware` flag has been removed; middleware is now always enabled
-  - The `context` parameter passed to `loader`, `action`, and `middleware` functions is always a `RouterContextProvider` instance
-  - `getLoadContext` functions in custom servers must return a `RouterContextProvider` — returning a plain object is no longer supported
-  - The `MiddlewareEnabled` type (previously exported as `UNSAFE_MiddlewareEnabled`) has been removed since the conditional it gated is now unconditional
-  - The `Future` module augmentation pattern (`interface Future { v8_middleware: true }`) is no longer needed to type `context` in Data Mode
-- `react-router` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
-- `react-router` - Update minimum React version to 19.2.7 ([#15062](https://github.com/remix-run/react-router/pull/15062))
 - `@react-router/architect` - Bump `@architect/functions` to v8 ([#15106](https://github.com/remix-run/react-router/pull/15106))
 - `@react-router/architect` - Remove the `useRequestContextDomainName` option from `createRequestHandler` - this is now the default behavior ([#15188](https://github.com/remix-run/react-router/pull/15188))
-- `@react-router/architect` - Update minimum Node version to 22.22.0 ([#15143](https://github.com/remix-run/react-router/pull/15143))
-- `@react-router/cloudflare` - Update minimum Node version to 22.22.0 ([#15143](https://github.com/remix-run/react-router/pull/15143))
 - `@react-router/dev` - Remove `@react-router/dev/vite/cloudflare` dev proxy export; use `@cloudflare/vite-plugin` instead ([#15077](https://github.com/remix-run/react-router/pull/15077))
   - Drops support for `wrangler@3` as a peer dependency of `@react-router/dev`
-- `@react-router/dev` - Remove the `future.v8_trailingSlashAwareDataRequests` flag ([#15100](https://github.com/remix-run/react-router/pull/15100))
-  - Trailing slash-aware data request URLs are now the default behavior.
-- `@react-router/dev` - Remove `future.v8_passThroughRequests` flag - the raw incoming `request` is now always passed through to `loader`/`action`. ([#15079](https://github.com/remix-run/react-router/pull/15079))
-- `@react-router/dev` - Move `future.v8_splitRouteModules` to a top-level `splitRouteModules` config option and change the default behavior to `true` ([#15086](https://github.com/remix-run/react-router/pull/15086))
-  - Set `splitRouteModules: false` to keep route modules in a single chunk
-  - Set `splitRouteModules: "enforce"` to require all routes to be splittable
-- `@react-router/dev` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
 - `@react-router/dev` - Require Vite 7+ and make the Vite Environment API build path mandatory ([#15077](https://github.com/remix-run/react-router/pull/15077))
-- `@react-router/dev` - Removed the `future.v8_viteEnvironmentApi` flag because the Vite Environment API is always enabled ([#15077](https://github.com/remix-run/react-router/pull/15077))
-- `@react-router/dev` - Removed the `future.unstable_previewServerPrerendering` flag and make prerendering with the Vite Environment API the default. ([#15077](https://github.com/remix-run/react-router/pull/15077))
 - `@react-router/express` - Bump dependencies ([#15106](https://github.com/remix-run/react-router/pull/15106))
   - Bumped `express` from `^4.19.2` to `^4.22.2`
   - Bumped the `express` peer dependency from `^4.17.1 || ^5` to `^4.22.2 || ^5`
   - Bumped `@types/express` from `^4.17.9` to `^4.17.25`
-- `@react-router/express` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
-- `@react-router/fs-routes` - Update minimum Node version to 22.22.0 ([#15143](https://github.com/remix-run/react-router/pull/15143))
 - `@react-router/node` - Switch from `@mjackson/node-fetch-server` to `@remix-run/node-fetch-server` now that we can directly use ESM-only packages ([#14930](https://github.com/remix-run/react-router/pull/14930))
-- `@react-router/node` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
-- `@react-router/remix-routes-option-adapter` - Update minimum Node version to 22.22.0 ([#15143](https://github.com/remix-run/react-router/pull/15143))
 - `@react-router/serve` - Switch from `@mjackson/node-fetch-server` to `@remix-run/node-fetch-server` now that we can directly use ESM-only packages ([#14930](https://github.com/remix-run/react-router/pull/14930))
-- `@react-router/serve` - Update minimum Node version to 22.22.0 ([#14928](https://github.com/remix-run/react-router/pull/14928))
 - `create-react-router` - Switch from `@remix-run/web-fetch` to native `fetch` internally. ([#14929](https://github.com/remix-run/react-router/pull/14929))
   - This removes the underlying `HTTPS_PROXY` support that `node-fetch` and subsequently `@remix-run/web-fetch` supported
-- `create-react-router` - Update minimum Node version to 22.22.0 ([#15143](https://github.com/remix-run/react-router/pull/15143))
 
 ### Minor Changes
 
@@ -236,6 +242,7 @@ The `@react-router/architect` `createRequestHandler` `useRequestContextDomainNam
   - Bumped `valibot` from `^1.2.0` to `^1.4.1`
 - `@react-router/dev` - Replace `cookie` and `set-cookie-parser` with `cookie-es` ([#15109](https://github.com/remix-run/react-router/pull/15109))
 - `@react-router/dev` - Removed the `vite-node` dependency in favor of Vite's native module runner APIs ([#15104](https://github.com/remix-run/react-router/pull/15104))
+- `@react-router/serve` - Bump `express` from `4.21.2` to `5.2.1` ([#15101](https://github.com/remix-run/react-router/issues/15101))
 - `create-react-router` - Bump dependencies ([#15080](https://github.com/remix-run/react-router/pull/15080))
   - Bumped `execa` from `5.1.1` to `9.6.1`
   - Bumped `log-update` from `^5.0.1` to `^8.0.0`
@@ -283,7 +290,9 @@ The `@react-router/architect` `createRequestHandler` `useRequestContextDomainNam
   - Bumped `@remix-run/node-fetch-server` from `^0.13.0` to `^0.13.3`
   - Bumped `get-port` from `5.1.1` to `7.2.0`
 
-**Full Changelog**: [`v8.0.0-pre.1...v8.0.0`](https://github.com/remix-run/react-router/compare/react-router@8.0.0-pre.1...react-router@8.0.0)
+**Full Changelog**: [`v7.18.0...v8.0.0`](https://github.com/remix-run/react-router/compare/react-router@7.18.0...react-router@8.0.0)
+
+# React Router v7 Releases
 
 ## v7.18.0
 

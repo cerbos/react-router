@@ -24,7 +24,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Don't cancel in-progress runs - once a release flow has started we want it
+  # to run all the way through so subsequent commits (like formatting) don't
+  # interrupt publishing/commenting
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -36,7 +39,7 @@ jobs:
       should_publish: ${{ steps.needs-publish.outputs.should_publish }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check for change files
         id: check
@@ -78,14 +81,14 @@ jobs:
       pull-requests: write # enable opening a PR for the release
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
           token: ${{ secrets.FORMAT_PAT }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: Install Node.js
         uses: actions/setup-node@v6
@@ -111,7 +114,7 @@ jobs:
       id-token: write # enable generation of an ID token for publishing
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -144,7 +147,7 @@ jobs:
       pull-requests: write # enable commenting on released pull requests
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -174,7 +177,7 @@ jobs:
       id-token: write # enable generation of an ID token for publishing
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0 # needed for tags
@@ -206,7 +209,7 @@ jobs:
       id-token: write # enable generation of an ID token for publishing
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.branch }}
           # checkout using a custom token so that we can push later on
