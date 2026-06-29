@@ -100,7 +100,7 @@ function derive(build: ServerBuild, mode?: string) {
           "`getLoadContext` function.",
       );
       handleError(error);
-      throw error;
+      return returnLastResortErrorResponse(error, serverMode);
     }
     loadContext = initialContext || new RouterContextProvider();
 
@@ -620,7 +620,7 @@ async function handleDocumentRequest(
         );
       } catch (error: any) {
         handleError(error);
-        throw error;
+        return returnLastResortErrorResponse(error, serverMode);
       }
     }
   }
@@ -690,11 +690,11 @@ async function handleResourceRequest(
         "Expected a Response to be returned from resource route handler",
       );
       handleError(newError);
-      throw error;
+      return returnLastResortErrorResponse(newError, serverMode);
     }
 
     handleError(error);
-    throw error;
+    return returnLastResortErrorResponse(error, serverMode);
   }
 }
 
@@ -713,6 +713,10 @@ function errorResponseToJson(
       statusText: errorResponse.statusText,
     },
   );
+}
+
+function returnLastResortErrorResponse(error: any, serverMode?: ServerMode) {
+  throw error;
 }
 
 function unwrapResponse(response: Response) {
