@@ -1,8 +1,15 @@
 {
   "name": "@react-router/dev",
   "type": "module",
-  "version": "8.0.1",
+  "version": "8.1.0",
   "description": "Dev tools and CLI for React Router",
+  "keywords": [
+    "react",
+    "router",
+    "react-router",
+    "vite",
+    "vite-plugin"
+  ],
   "homepage": "https://reactrouter.com",
   "bugs": {
     "url": "https://github.com/remix-run/react-router/issues"
@@ -41,6 +48,17 @@
   "bin": {
     "react-router": "bin.cjs"
   },
+  "compatiblePackages": {
+    "schemaVersion": 1,
+    "rolldown": {
+      "type": "incompatible",
+      "reason": "Uses Vite-specific APIs"
+    },
+    "rollup": {
+      "type": "incompatible",
+      "reason": "Uses Vite-specific APIs"
+    }
+  },
   "scripts": {
     "build": "wireit",
     "typecheck": "tsc"
@@ -75,7 +93,6 @@
     "@babel/types": "^7.29.7",
     "@react-router/node": "workspace:*",
     "@remix-run/node-fetch-server": "^0.13.3",
-    "arg": "^5.0.1",
     "babel-dead-code-elimination": "^1.0.12",
     "chokidar": "^5.0.0",
     "dedent": "^1.7.2",

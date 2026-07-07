@@ -36,6 +36,7 @@ import pick from "lodash/pick.js";
 import jsesc from "jsesc";
 import colors from "picocolors";
 import kebabCase from "lodash/kebabCase.js";
+import { readPackageJSON, type PackageJson } from "pkg-types";
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -1336,33 +1337,18 @@ export const reactRouterVitePlugin: ReactRouterVitePlugin = () => {
               invariant(viteConfig);
               viteConfig.logger.info("Using Vite Environment API");
 
-              try {
-                let { reactRouterConfig } = ctx;
+              await cleanBuildDirectory(viteConfig, ctx);
 
-                await cleanBuildDirectory(viteConfig, ctx);
+              await builder.build(builder.environments.client);
 
-                await builder.build(builder.environments.client);
+              let serverEnvironments = getServerEnvironmentValues(
+                ctx,
+                builder.environments,
+              );
 
-                let serverEnvironments = getServerEnvironmentValues(
-                  ctx,
-                  builder.environments,
-                );
+              await Promise.all(serverEnvironments.map(builder.build));
 
-                await Promise.all(serverEnvironments.map(builder.build));
-
-                await cleanViteManifests(environments, ctx);
-
-                let { buildManifest } = ctx;
-                invariant(buildManifest, "Expected build manifest");
-
-                await reactRouterConfig.buildEnd?.({
-                  buildManifest,
-                  reactRouterConfig,
-                  viteConfig,
-                });
-              } finally {
-                await closePluginResources();
-              }
+              await cleanViteManifests(environments, ctx);
             },
           },
         };
@@ -1470,7 +1456,7 @@ export const reactRouterVitePlugin: ReactRouterVitePlugin = () => {
             hmr: false,
           },
           configFile: false,
-          envFile: false,
+          envDir: false,
           plugins: [
             childCompilerPlugins
               // Exclude this plugin from the child compiler to prevent an
@@ -2724,6 +2710,36 @@ export const reactRouterVitePlugin: ReactRouterVitePlugin = () => {
         }
       },
     }),
+    {
+      name: "react-router-build-end",
+      sharedDuringBuild: true,
+      config: {
+        order: "post",
+        handler({ builder: { buildApp } = {} }) {
+          return {
+            builder: {
+              async buildApp(builder) {
+                try {
+                  await buildApp?.(builder);
+
+                  invariant(viteConfig);
+                  let { buildManifest, reactRouterConfig } = ctx;
+                  invariant(buildManifest, "Expected build manifest");
+
+                  await reactRouterConfig.buildEnd?.({
+                    buildManifest,
+                    reactRouterConfig,
+                    viteConfig,
+                  });
+                } finally {
+                  await closePluginResources();
+                }
+              },
+            },
+          };
+        },
+      },
+    },
     validatePluginOrder(),
     warnOnClientSourceMaps(),
   ];
@@ -3485,6 +3501,9 @@ export async function getEnvironmentOptionsResolvers(
   viteCommand: Vite.ResolvedConfig["command"],
 ): Promise<EnvironmentOptionsResolvers> {
   let { serverBuildFile, serverModuleFormat } = ctx.reactRouterConfig;
+  let pkgJson: PackageJson = await readPackageJSON(ctx.rootDirectory).catch(
+    () => ({}),
+  );
 
   let packageRoot = path.dirname(
     nodeRequire.resolve("@react-router/dev/package.json"),
@@ -3549,10 +3568,24 @@ export async function getEnvironmentOptionsResolvers(
     // https://vite.dev/guide/migration.html#default-value-for-resolve-conditions
     let maybeDefaultServerConditions = vite.defaultServerConditions || [];
 
-    // There is no helpful export with the default external conditions (see
-    // https://github.com/vitejs/vite/pull/20279 for more details). So, for now,
-    // we are hardcording the default here.
-    let defaultExternalConditions = ["node"];
+    // Vite added this in 7.1, so we need to be defensive since our minimum version is 7.0
+    let defaultExternalConditions = vite.defaultExternalConditions ?? ["node"];
+
+    // If we couldn't find the package.json, we assume node for backwards compatibility
+    let isNode =
+      !pkgJson.dependencies ||
+      pkgJson.dependencies["@react-router/node"] ||
+      pkgJson.dependencies["@react-router/express"] ||
+      pkgJson.dependencies["@react-router/serve"];
+
+    if (!isNode) {
+      maybeDefaultServerConditions = maybeDefaultServerConditions.filter(
+        (c) => c !== "node",
+      );
+      defaultExternalConditions = defaultExternalConditions.filter(
+        (c) => c !== "node",
+      );
+    }
 
     let baseConditions = [
       ...maybeDevelopmentConditions,

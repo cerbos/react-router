@@ -1,5 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { execFileSync, spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -13,8 +14,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import semver from "semver";
-import stripAnsi from "strip-ansi";
 
 import { jestTimeout } from "./setupAfterEnv";
 import { server } from "./msw";
@@ -22,14 +23,16 @@ import { server } from "./msw";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const nodeRequire = createRequire(import.meta.url);
-const execaModuleId = nodeRequire.resolve("execa");
-const mockedExeca = jest.fn();
+const actualChildProcess = nodeRequire(
+  "node:child_process",
+) as typeof import("node:child_process");
+const mockedSpawn = jest.fn(actualChildProcess.spawn);
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const BUILT_CLI = path.resolve(__dirname, "../dist/cli.js");
 
-(jest as any).unstable_mockModule(execaModuleId, () => ({
-  default: mockedExeca,
-  execa: mockedExeca,
+(jest as any).unstable_mockModule("node:child_process", () => ({
+  ...actualChildProcess,
+  spawn: mockedSpawn,
 }));
 
 let createReactRouter: typeof import("../index").createReactRouter;
@@ -67,6 +70,7 @@ describe("create-react-router CLI", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedSpawn.mockImplementation(actualChildProcess.spawn);
   });
 
   afterEach(async () => {
@@ -75,6 +79,14 @@ describe("create-react-router CLI", () => {
     }
     tempDirs = new Set<string>();
   });
+
+  function mockSpawnSuccess() {
+    mockedSpawn.mockImplementation(() => {
+      let child = new EventEmitter();
+      process.nextTick(() => child.emit("exit", 0, null));
+      return child as ReturnType<typeof spawn>;
+    });
+  }
 
   function getProjectDir(name: string) {
     let tmpDir = path.join(TEMP_DIR, name);
@@ -108,6 +120,7 @@ describe("create-react-router CLI", () => {
      --[no-]install      Whether or not to install dependencies after creation
      --package-manager   The package manager to use
      --show-install-output   Whether to show the output of the install process
+     --[no-]agent-skills Whether or not to include the React Router agent skill
      --[no-]git-init     Whether or not to initialize a Git repository
      --yes, -y           Skip all option prompts and run setup
      --react-router-version, -v     The version of React Router to use
@@ -147,6 +160,18 @@ describe("create-react-router CLI", () => {
     expect(!!semver.valid(stdout.trim())).toBe(true);
   });
 
+  it("supports short aliases", async () => {
+    let [{ stdout: helpOutput }, { stdout: versionOutput }] = await Promise.all(
+      [
+        execCreateReactRouter({ args: ["-h"] }),
+        execCreateReactRouter({ args: ["-V"] }),
+      ],
+    );
+
+    expect(helpOutput).toContain("Usage:");
+    expect(!!semver.valid(versionOutput.trim())).toBe(true);
+  });
+
   it("allows you to go through the prompts", async () => {
     let projectDir = getProjectDir("prompts");
 
@@ -164,6 +189,10 @@ describe("create-react-router CLI", () => {
         {
           question: /install dependencies/i,
           type: ["n"],
+        },
+        {
+          question: /agent skill/i,
+          type: ["y"],
         },
       ],
     });
@@ -185,6 +214,49 @@ describe("create-react-router CLI", () => {
     expect(status).toBe(0);
     expect(existsSync(path.join(projectDir, "package.json"))).toBeTruthy();
     expect(existsSync(path.join(projectDir, "app/root.tsx"))).toBeTruthy();
+    expect(
+      existsSync(path.join(projectDir, ".agents/skills/react-router/SKILL.md")),
+    ).toBeTruthy();
+  });
+
+  it("ignores unknown flags", async () => {
+    let projectDir = getProjectDir("unknown-flags");
+
+    let { status, stderr } = await execCreateReactRouter({
+      args: [
+        projectDir,
+        "--future-flag",
+        "--yes",
+        "--no-git-init",
+        "--no-install",
+      ],
+    });
+
+    expect(stderr.trim()).toBeFalsy();
+    expect(status).toBe(0);
+    expect(existsSync(path.join(projectDir, "package.json"))).toBeTruthy();
+    expect(existsSync(path.join(projectDir, "app/root.tsx"))).toBeTruthy();
+  });
+
+  it("supports the --no-agent-skills flag", async () => {
+    let projectDir = getProjectDir("no-agent-skills");
+
+    let { status, stderr } = await execCreateReactRouter({
+      args: [
+        projectDir,
+        "--yes",
+        "--no-agent-skills",
+        "--no-git-init",
+        "--no-install",
+      ],
+    });
+
+    expect(stderr.trim()).toBeFalsy();
+    expect(status).toBe(0);
+    expect(existsSync(path.join(projectDir, "package.json"))).toBeTruthy();
+    expect(
+      existsSync(path.join(projectDir, ".agents/skills/react-router/SKILL.md")),
+    ).toBeFalsy();
   });
 
   it("errors when project directory isn't provided when shell isn't interactive", async () => {
@@ -520,8 +592,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("npm-install-default");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -534,11 +605,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "npm",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -554,8 +626,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("npm-install-on-unknown-package-manager");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -568,11 +639,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "npm",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -588,8 +660,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("npm-install-from-user-agent");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -602,11 +673,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "npm",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -621,8 +693,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("yarn-create-from-user-agent");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -635,11 +706,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "yarn",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -654,8 +726,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("pnpm-create-from-user-agent");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -668,11 +739,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "pnpm",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -687,8 +759,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("bun-create-from-user-agent");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -701,11 +772,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "bun",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -720,8 +792,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("deno-create-from-user-agent");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -734,11 +805,12 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "deno",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -753,8 +825,7 @@ describe("create-react-router CLI", () => {
 
     let projectDir = getProjectDir("pnpm-create-override");
 
-    let execa = mockedExeca;
-    execa.mockImplementation(async () => {});
+    mockSpawnSuccess();
 
     // Suppress terminal output
     let stdoutMock = jest
@@ -767,13 +838,14 @@ describe("create-react-router CLI", () => {
       path.join(__dirname, "fixtures", "blank"),
       "--no-git-init",
       "--yes",
+      "--no-agent-skills",
       "--package-manager",
       "pnpm",
     ]);
 
     stdoutMock.mockReset();
 
-    expect(execa).toHaveBeenCalledWith(
+    expect(mockedSpawn).toHaveBeenCalledWith(
       "pnpm",
       expect.arrayContaining(["install"]),
       expect.anything(),
@@ -1177,6 +1249,17 @@ async function execCreateReactRouter({
   cwd?: string;
 }) {
   let cliPath = await ensureBuiltCli();
+  let controlsAgentSkills = args.some((arg) =>
+    ["--agent-skills", "--no-agent-skills", "--yes"].includes(arg),
+  );
+  let answersAgentSkillsPrompt = interactions.some(({ question }) =>
+    question.test("agent skill"),
+  );
+
+  if (interactive && !controlsAgentSkills && !answersAgentSkillsPrompt) {
+    args = [...args, "--no-agent-skills"];
+  }
+
   let proc = spawn(
     "node",
     [
@@ -1219,6 +1302,15 @@ async function ensureBuiltCli() {
         env: { ...process.env, NO_COLOR: "1" },
         stdio: "pipe",
       });
+      execFileSync(
+        pnpm,
+        ["run", "--filter", "create-react-router", "prepack"],
+        {
+          cwd: REPO_ROOT,
+          env: { ...process.env, NO_COLOR: "1" },
+          stdio: "pipe",
+        },
+      );
       return BUILT_CLI;
     });
   }
