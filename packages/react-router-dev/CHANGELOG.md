@@ -1,5 +1,45 @@
 # `@react-router/dev`
 
+## v8.3.0
+
+### Minor Changes
+
+- Restart `react-router dev` with `--conditions=development` when not already configured ([#15291](https://github.com/remix-run/react-router/pull/15291))
+
+### Patch Changes
+
+- Allow `typescript@7` to be used ([#15317](https://github.com/remix-run/react-router/pull/15317))
+
+### Unstable Changes
+
+⚠️  _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
+
+- Add `unstable_rsc/client-version` client build version virtual module ([#15318](https://github.com/remix-run/react-router/pull/15318))
+
+- Support the `subResourceIntegrity` config option in RSC Framework Mode ([#15321](https://github.com/remix-run/react-router/pull/15321))
+
+  #### Migration guide
+
+  No changes are required when using the default RSC SSR entry. If you maintain a custom `app/entry.ssr.tsx`, import the new virtual module and pass its hashes to React's `importMap` render option:
+
+  ```diff
+  +import subResourceIntegrity from "virtual:react-router/unstable_rsc/subresource-integrity";
+
+  return renderToReadableStream(<RSCStaticRouter getPayload={getPayload} />, {
+    ...options,
+    bootstrapScriptContent,
+    formState,
+  + importMap: subResourceIntegrity
+  +   ? { integrity: subResourceIntegrity }
+  +   : undefined,
+    signal: request.signal,
+  });
+  ```
+- Updated dependencies:
+  - [`react-router@8.3.0`](https://github.com/remix-run/react-router/releases/tag/react-router@8.3.0)
+  - [`@react-router/node@8.3.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/node@8.3.0)
+  - [`@react-router/serve@8.3.0`](https://github.com/remix-run/react-router/releases/tag/@react-router/serve@8.3.0)
+
 ## v8.2.0
 
 ### Minor Changes
@@ -16,7 +56,7 @@
 
 ### Unstable Changes
 
-⚠️  _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
+⚠️ _[Unstable features](https://reactrouter.com/community/api-development-strategy#unstable-flags) are not recommended for production use_
 
 - Add the [`future.unstable_enableNodeReadableStream`](https://reactrouter.com/upgrading/future#futureunstable_enablenodereadablestream) flag to opt Node Framework mode apps into using `renderToReadableStream` instead of `renderToPipeableStream` ([#15290](https://github.com/remix-run/react-router/pull/15290))
   - This flag has no effect if you have your own `entry.server.tsx`
