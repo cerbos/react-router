@@ -25,6 +25,7 @@ import {
 } from "../../../lib/router/utils";
 
 import { isRedirect, tick } from "./utils";
+import getWindow from "../../utils/getWindow";
 
 // Routes passed into setup() should just have a boolean for loader/action
 // indicating they want a stub.  They get enhanced back to AgnosticRouteObjects
@@ -309,10 +310,13 @@ export function setup({
 
   // jsdom is making more and more properties non-configurable, so we inject
   // our own jest-friendly window.
-  let testWindow = {
-    ...window,
+  let testWindow = getWindow("/");
+  testWindow = {
+    ...testWindow,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
     location: {
-      ...window.location,
+      ...testWindow.location,
       assign: jest.fn(),
       replace: jest.fn(),
     },
@@ -381,10 +385,7 @@ export function setup({
           await internalHelpers.dfd.resolve(redirectResponse);
         }
         await tick();
-      } catch (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        e
-      ) {}
+      } catch {}
       return helpers;
     }
 
@@ -404,10 +405,7 @@ export function setup({
       async reject(value) {
         try {
           await internalHelpers.dfd.reject(value);
-        } catch (
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          e
-        ) {}
+        } catch {}
       },
       async redirect(href, status = 301, headers = {}, shims = []) {
         return _redirect(true, href, status, headers, shims);

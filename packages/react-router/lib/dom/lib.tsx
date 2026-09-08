@@ -121,10 +121,7 @@ try {
       // @ts-expect-error
       REACT_ROUTER_VERSION;
   }
-} catch (
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  e
-) {
+} catch {
   // no-op
 }
 //#endregion
@@ -751,10 +748,7 @@ function deserializeErrors(
             // because we don't serialize SSR stack traces for security reasons
             error.stack = "";
             serialized[key] = error;
-          } catch (
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            e
-          ) {
+          } catch {
             // no-op - fall through and create a normal Error
           }
         }
@@ -2609,6 +2603,7 @@ export function useSubmit(): SubmitFunction {
         await routerFetch(key, currentRouteId, options.action || action, {
           defaultShouldRevalidate: options.defaultShouldRevalidate,
           preventScrollReset: options.preventScrollReset,
+          relative: options.relative,
           formData,
           body,
           formMethod: options.method || (method as HTMLFormMethod),
@@ -2619,6 +2614,7 @@ export function useSubmit(): SubmitFunction {
         await routerNavigate(options.action || action, {
           defaultShouldRevalidate: options.defaultShouldRevalidate,
           preventScrollReset: options.preventScrollReset,
+          relative: options.relative,
           formData,
           body,
           formMethod: options.method || (method as HTMLFormMethod),
@@ -3110,6 +3106,15 @@ export function useScrollRestoration({
     };
   }, []);
 
+  // Re-enable manual scroll restoration on a bfcache restore
+  usePageShow(
+    React.useCallback((event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.history.scrollRestoration = "manual";
+      }
+    }, []),
+  );
+
   // Save positions on pagehide
   usePageHide(
     React.useCallback(() => {
@@ -3143,10 +3148,7 @@ export function useScrollRestoration({
         if (sessionPositions) {
           savedScrollPositions = JSON.parse(sessionPositions);
         }
-      } catch (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        e
-      ) {
+      } catch {
         // no-op, use default empty object
       }
     }, [storageKey]);
@@ -3254,6 +3256,24 @@ function usePageHide(
     window.addEventListener("pagehide", callback, opts);
     return () => {
       window.removeEventListener("pagehide", callback, opts);
+    };
+  }, [callback, capture]);
+}
+
+/*
+ * Setup a callback to be fired on the window's `pageshow` event. The event's
+ * `persisted` flag indicates the document was restored from the bfcache.
+ */
+function usePageShow(
+  callback: (event: PageTransitionEvent) => any,
+  options?: { capture?: boolean },
+): void {
+  let { capture } = options || {};
+  React.useEffect(() => {
+    let opts = capture != null ? { capture } : undefined;
+    window.addEventListener("pageshow", callback, opts);
+    return () => {
+      window.removeEventListener("pageshow", callback, opts);
     };
   }, [callback, capture]);
 }
