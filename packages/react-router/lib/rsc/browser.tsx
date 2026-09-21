@@ -22,7 +22,6 @@ import type {
   DataRouteObject,
   DataStrategyFunction,
   DataStrategyFunctionArgs,
-  RouterContextProvider,
 } from "../router/utils";
 import { ErrorResponseImpl, createContext, resolvePath } from "../router/utils";
 import { PROTOCOL_RELATIVE_URL_REGEX } from "../router/url";
@@ -320,6 +319,7 @@ function createRouterFromPayload({
       },
       location: payload.location,
       basename: payload.basename,
+      future: {},
       isSpaMode: false,
     }),
     async patchRoutesOnNavigation({ path, signal, fetcherKey }) {
